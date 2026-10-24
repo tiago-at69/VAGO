@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VAGO</title>
+    <script>
+        (function () {
+            var s = localStorage.getItem('vago_tema');
+            document.documentElement.dataset.tema = (s === 'escuro' || s === 'claro')
+                ? s
+                : (matchMedia('(prefers-color-scheme: dark)').matches ? 'escuro' : 'claro');
+        })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header>
+    <div class="logo">VAGO</div>
+    <nav>
+        <button data-tela="tela-feed">Restaurantes</button>
+        <button data-tela="tela-ranking">Ranking</button>
+        <button data-tela="tela-favoritos" class="logado" hidden>♥ Favoritos</button>
+        <button data-tela="tela-reservas" class="logado" hidden>Minhas reservas</button>
+        <button data-tela="tela-cadastro" class="logado" hidden>+ Restaurante</button>
+        <button data-tela="tela-perfil" id="btn-perfil" class="logado" hidden>Perfil</button>
+        <button data-tela="tela-login" class="deslogado">Entrar</button>
+        <button data-acao="sair" class="logado" hidden>Sair</button>
+        <button type="button" id="btn-tema" data-acao="tema" aria-pressed="false" title="Ativar modo escuro">☾ Escuro</button>
+    </nav>
+</header>
+
+<main>
+    <section id="tela-feed" class="tela ativa">
+        <h2>Restaurantes</h2>
+        <div class="filtros">
+            <input id="busca-nome" placeholder="Pesquisar por nome...">
+            <select id="filtro-categoria"><option value="">Todas as categorias</option></select>
+            <select id="filtro-nota" aria-label="Nota mínima">
+                <option value="">Qualquer nota</option>
+                <option value="5">★ 5</option>
+                <option value="4">★ 4 ou mais</option>
+                <option value="3">★ 3 ou mais</option>
+                <option value="2">★ 2 ou mais</option>
+                <option value="1">★ 1 ou mais</option>
+            </select>
+            <select id="filtro-raio" aria-label="Distância máxima">
+                <option value="">Qualquer distância</option>
+                <option value="1">Até 1 km</option>
+                <option value="2">Até 2 km</option>
+                <option value="5">Até 5 km</option>
+                <option value="10">Até 10 km</option>
+                <option value="25">Até 25 km</option>
+            </select>
+            <button class="primario" data-acao="buscar">Buscar</button>
+            <button data-acao="limpar">Limpar</button>
+            <button data-acao="usar-local" id="btn-local">📍 Perto de mim</button>
+            <button data-acao="ver-mapa" id="btn-feed-mapa">🗺 Mapa</button>
+        </div>
+        <div id="lista-restaurantes" class="grid"></div>
+        <div id="paginacao" class="paginacao"></div>
+    </section>
+
+    <section id="tela-ranking" class="tela">
+        <h2>Ranking</h2>
+        <div class="abas" id="abas-ranking">
+            <button data-rank="restaurantes" class="on">Restaurantes</button>
+            <button data-rank="pratos">Pratos</button>
+        </div>
+        <div id="lista-ranking" class="grid"></div>
+    </section>
+    <section id="tela-favoritos" class="tela"><h2>Meus Favoritos</h2><div id="lista-favoritos" class="grid"></div></section>
+    <section id="tela-reservas" class="tela"><h2>Minhas Reservas</h2><div id="lista-reservas" class="painel lista" style="margin-top:1rem"></div></section>
+    <section id="tela-perfil" class="tela"><h2>Meu perfil</h2><div id="perfil-conteudo"></div></section>
+
+    <section id="tela-detalhe" class="tela">
+        <button data-tela="tela-feed">&larr; Voltar</button>
+        <div id="detalhe-topo" class="painel hero" style="margin-top:1rem"></div>
+        <div class="abas" id="abas">
+            <button data-aba="cardapio">Cardápio</button>
+            <button data-aba="mapa">Mapa</button>
+            <button data-aba="reservar">Mesas &amp; Reservas</button>
+            <button data-aba="promocoes">Promoções</button>
+            <button data-aba="fila">Fila de espera</button>
+            <button data-aba="avaliacoes">Avaliações</button>
+        </div>
+        <div id="aba-conteudo" class="painel"></div>
+    </section>
+
+    <section id="tela-cadastro" class="tela">
+        <h2>Cadastrar Restaurante</h2>
+        <form data-acao="cad-restaurante" class="painel">
+            <label>Nome* <input id="cad-nome" required maxlength="255"></label>
+            <div class="linha">
+                <label>Tipo de culinária* <select id="cad-categoria" required></select></label>
+                <label>Telefone <input id="cad-telefone" maxlength="30" placeholder="(00) 00000-0000"></label>
+            </div>
+            <label>Endereço* <input id="cad-endereco" required maxlength="255"></label>
+            <div class="linha">
+                <label>Capacidade (mesas) <input id="cad-capacidade" type="number" min="0" value="0"></label>
+                <label>Tolerância de atraso <input id="cad-tolerancia" type="time" value="00:15"></label>
+            </div>
+            <label>Descrição <textarea id="cad-descricao" rows="3" maxlength="2000"></textarea></label>
+            <button class="primario">Salvar restaurante</button>
+        </form>
+    </section>
+
+    <section id="tela-login" class="tela">
+        <div class="duas">
+            <div class="painel">
+                <h2>Entrar</h2>
+                <form data-acao="login">
+                    <label>E-mail <input id="login-email" type="email" required></label>
+                    <label>Senha <input id="login-senha" type="password" required></label>
+                    <button class="primario">Entrar</button>
+                </form>
+            </div>
+            <div class="painel">
+                <h2>Criar conta</h2>
+                <form data-acao="cad-usuario">
+                    <label>Nome completo <input id="u-nome" required maxlength="255"></label>
+                    <label>E-mail <input id="u-email" type="email" required></label>
+                    <div class="linha">
+                        <label>CPF (11 dígitos) <input id="u-cpf" inputmode="numeric" pattern="\d{11}" maxlength="11"></label>
+                        <label>Telefone <input id="u-tel" maxlength="30"></label>
+                    </div>
+                    <label>Senha (mín. 8) <input id="u-senha" type="password" required minlength="8"></label>
+                    <button class="primario">Cadastrar</button>
+                </form>
+            </div>
+        </div>
+    </section>
+</main>
+<div id="toast" hidden></div>
+<script src="app.js"></script>
+</body>
+</html>
