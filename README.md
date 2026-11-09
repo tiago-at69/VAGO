@@ -4,14 +4,22 @@ API (Laravel + Sanctum) e front simples para avaliação e ranking de restaurant
 
 ## Como rodar
 
+O banco da aplicação é MySQL. Crie o banco e o usuário local (a senha abaixo é só de desenvolvimento):
+
+```sql
+CREATE DATABASE vago CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'vago'@'127.0.0.1' IDENTIFIED BY 'vago';
+GRANT ALL PRIVILEGES ON vago.* TO 'vago'@'127.0.0.1';
+FLUSH PRIVILEGES;
+```
+
 ```bash
 composer install
 cp .env.example .env
 php artisan key:generate
-touch database/database.sqlite
 php artisan migrate
 php artisan serve        # front em http://localhost:8000 (public/index.html)
-php artisan test         # testes
+php artisan test         # testes (SQLite em memória, sem mexer no MySQL)
 ```
 
 ## Endpoints
