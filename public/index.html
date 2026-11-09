@@ -26,8 +26,9 @@
     </button>
     <nav class="menu" aria-label="Principal">
         <button type="button" data-tela="tela-inicio" data-nav="tela-inicio" class="on">Início</button>
-        <button type="button" data-tela="tela-feed" data-nav="tela-feed">Restaurantes</button>
-        <button type="button" data-tela="tela-mesas" data-nav="tela-mesas">Mesas</button>
+        <button type="button" data-tela="tela-feed" data-nav="tela-feed" class="nao-restaurante">Restaurantes</button>
+        <button type="button" data-tela="tela-cardapio" data-nav="tela-cardapio" class="so-restaurante" hidden>Cardápio</button>
+        <button type="button" data-tela="tela-mesas" data-nav="tela-mesas" class="nao-cliente">Mesas</button>
         <button type="button" data-tela="tela-promocoes" data-nav="tela-promocoes">Promoções</button>
         <button type="button" data-tela="tela-reservas" data-nav="tela-reservas" class="logado" hidden>Reservas</button>
         <button type="button" data-tela="tela-avaliacoes" data-nav="tela-avaliacoes" class="logado" hidden>Avaliações</button>
@@ -54,7 +55,8 @@
             <p class="olho olho-claro">Reserva urbana imediata</p>
             <h1>Mesas prontas <em>em</em><br><em>minutos</em></h1>
             <p class="hero-lead">Curadoria direta de balcões e salões autorais na sua região. Escolha o horário exato e garanta seu lugar sem filas ou telefonemas.</p>
-            <button type="button" class="btn-laranja" data-tela="tela-feed">Reservar mesa</button>
+            <button type="button" class="btn-laranja nao-restaurante" data-tela="tela-feed">Reservar mesa</button>
+            <button type="button" class="btn-laranja so-restaurante" data-tela="tela-cardapio" hidden>Abrir o cardápio</button>
         </div>
 
         <section class="numeros-salao" aria-labelledby="titulo-numeros">
@@ -67,7 +69,7 @@
             </div>
         </section>
 
-        <section class="estilos" aria-labelledby="titulo-estilos">
+        <section class="estilos nao-restaurante" aria-labelledby="titulo-estilos">
             <div class="miolo">
                 <p class="olho">Estilos em destaque</p>
                 <h2 id="titulo-estilos">Balcões e salões autorais</h2>
@@ -89,7 +91,7 @@
             </div>
         </section>
 
-        <section class="chamada">
+        <section class="chamada nao-restaurante">
             <h2>Sua mesa garantida agora</h2>
             <p>Navegue pelo mapa por bairro, filtre pelo seu estilo culinário preferido e receba a confirmação do restaurante em poucos segundos.</p>
             <button type="button" class="btn-escuro" data-tela="tela-feed">Escolher restaurante</button>
@@ -168,7 +170,7 @@
 
     <section id="tela-detalhe" class="tela">
         <div class="miolo">
-            <button type="button" class="voltar" data-tela="tela-feed">← Voltar aos restaurantes</button>
+            <button type="button" class="voltar" id="btn-voltar-detalhe" data-tela="tela-feed">← Voltar aos restaurantes</button>
             <div id="detalhe-topo" class="painel hero"></div>
             <div class="abas" id="abas">
                 <button type="button" data-aba="cardapio">Cardápio</button>
@@ -197,6 +199,15 @@
             <h2>Avaliações</h2>
             <p class="lead" id="lead-avaliacoes">Restaurantes e pratos do cardápio.</p>
             <div id="lista-avaliacoes"></div>
+        </div>
+    </section>
+
+    <section id="tela-cardapio" class="tela">
+        <div class="miolo">
+            <p class="olho">O que a casa serve</p>
+            <h2>Cardápio</h2>
+            <p class="lead" id="lead-cardapio">Inclua os pratos e acompanhe o que os clientes escreveram sobre cada um.</p>
+            <div id="lista-cardapio"></div>
         </div>
     </section>
 
@@ -339,7 +350,7 @@
         <div class="rodape-direita">
             <nav class="rodape-nav" aria-label="Rodapé">
                 <button type="button" data-tela="tela-inicio">Início</button>
-                <button type="button" data-tela="tela-feed">Restaurantes</button>
+                <button type="button" data-tela="tela-feed" class="nao-restaurante">Restaurantes</button>
                 <button type="button" data-tela="tela-contato">Contato</button>
             </nav>
             <p class="olho">Contato e parcerias</p>

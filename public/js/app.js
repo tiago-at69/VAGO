@@ -89,16 +89,20 @@ function aplicarTema(tema) {
 }
 
 // ---------- Navegação ----------
-const PROTEGIDAS = new Set(['tela-favoritos', 'tela-reservas', 'tela-perfil', 'tela-avaliacoes', 'tela-fila']);
+const PROTEGIDAS = new Set(['tela-favoritos', 'tela-reservas', 'tela-perfil', 'tela-avaliacoes', 'tela-fila', 'tela-cardapio']);
 function navegarPara(id) {
+    if (id === 'tela-feed' && ehRestaurante()) id = 'tela-cardapio';
+    if (id === 'tela-mesas' && ehCliente()) id = 'tela-feed';
+    if (id === 'tela-cardapio' && !ehRestaurante()) id = E.token ? 'tela-feed' : 'tela-login';
     if (PROTEGIDAS.has(id) && !E.token) id = 'tela-login';
     document.querySelectorAll('.tela').forEach((t) => t.classList.toggle('ativa', t.id === id));
-    const nav = { 'tela-detalhe': 'tela-feed' }[id] || id;
+    const nav = id === 'tela-detalhe' ? (ehRestaurante() ? 'tela-cardapio' : 'tela-feed') : id;
     document.querySelectorAll('[data-nav]').forEach((b) => b.classList.toggle('on', b.dataset.nav === nav));
     ({ 'tela-feed': () => carregarRestaurantes(),
        'tela-favoritos': carregarFavoritos, 'tela-reservas': carregarReservas,
        'tela-perfil': carregarPerfil, 'tela-promocoes': carregarPromocoes,
        'tela-avaliacoes': carregarAvaliacoes, 'tela-mesas': carregarMesas,
+       'tela-cardapio': carregarCardapio,
        'tela-fila': carregarFila, 'tela-cadastro': prepararCadastroRestaurante })[id]?.();
     window.scrollTo(0, 0);
 }
@@ -117,6 +121,9 @@ function atualizarConta() {
     document.querySelectorAll('.logado').forEach((e) => (e.hidden = !E.token));
     document.querySelectorAll('.deslogado').forEach((e) => (e.hidden = !!E.token));
     document.querySelectorAll('.so-cliente').forEach((e) => (e.hidden = !ehCliente()));
+    document.querySelectorAll('.so-restaurante').forEach((e) => (e.hidden = !ehRestaurante()));
+    document.querySelectorAll('.nao-cliente').forEach((e) => (e.hidden = ehCliente()));
+    document.querySelectorAll('.nao-restaurante').forEach((e) => (e.hidden = ehRestaurante()));
     const b = $('btn-perfil');
     const nome = E.user?.name || '';
     const tipo = $('tipo-conta');
@@ -289,6 +296,11 @@ async function abrirRestaurante(id, aba) {
     await tentar(async () => {
         E.r = await api(`/restaurantes/${id}`);
         E.mesaSel = null;
+        const voltar = $('btn-voltar-detalhe');
+        if (voltar) {
+            voltar.dataset.tela = ehRestaurante() ? 'tela-cardapio' : 'tela-feed';
+            voltar.textContent = ehRestaurante() ? '← Voltar ao cardápio' : '← Voltar aos restaurantes';
+        }
         const r = E.r;
         $('detalhe-topo').innerHTML = `
             <span class="selo">${esc(r.categoria || 'Geral')}</span>
@@ -344,26 +356,33 @@ const cardPrato = (p, dono) => `<div class="card">
 
 const formDono = (acao, titulo, campos) => `<div class="dono"><strong>👑 Área do dono · ${titulo}</strong>
     <form data-acao="${acao}">${campos}<button class="primario">Adicionar</button></form></div>`;
+function camposPrato(prefixo) {
+    const id = (nome) => prefixo + nome;
+    return `<div class="linha">
+        <label>Nome <input id="${id('p-nome')}" required maxlength="255"></label>
+        <label>Preço (R$) <input id="${id('p-preco')}" type="number" step="0.01" min="0" required></label>
+    </div>
+    <label>Categoria <select id="${id('p-cat')}">${PRATO_CATS.map((c) => `<option${c === 'Prato principal' ? ' selected' : ''}>${esc(c)}</option>`).join('')}</select></label>
+    <label>Descrição <textarea id="${id('p-desc')}" rows="2" maxlength="2000" placeholder="Ingredientes, porção..."></textarea></label>
+    <label>URL da foto <input id="${id('p-foto')}" type="url" placeholder="https://..."></label>`;
+}
+
+function htmlCardapio(itens, dono) {
+    const grupos = {};
+    itens.forEach((p) => { (grupos[p.categoria || 'Outro'] ||= []).push(p); });
+    const blocos = PRATO_CATS.filter((c) => grupos[c]).map((c, i) =>
+        `<h3 style="margin-top:${i ? '1.2rem' : '0'}">${esc(c)}</h3><div class="grid">${grupos[c].map((p) => cardPrato(p, dono)).join('')}</div>`).join('');
+    return itens.length ? blocos : vazio('O cardápio ainda está vazio.');
+}
 
 const ABAS = {
     async mapa() { return htmlMaps(E.r); },
     async cardapio(id, dono) {
         const itens = await api(`/restaurantes/${id}/cardapio`);
-        const grupos = {};
-        itens.forEach((p) => { (grupos[p.categoria || 'Outro'] ||= []).push(p); });
-        const blocos = PRATO_CATS.filter((c) => grupos[c]).map((c, i) =>
-            `<h3 style="margin-top:${i ? '1.2rem' : '0'}">${esc(c)}</h3><div class="grid">${grupos[c].map((p) => cardPrato(p, dono)).join('')}</div>`).join('');
-        return (itens.length ? blocos : vazio('O cardápio ainda está vazio.'))
+        return htmlCardapio(itens, dono)
             + (!E.token && itens.length ? vazio('Entre com uma conta de cliente para avaliar os pratos.') : '')
             + (ehRestaurante() && !dono && itens.length ? vazio('Para avaliar os pratos, use uma conta de cliente.') : '')
-            + (dono ? formDono('add-prato', 'novo prato', `
-                <div class="linha">
-                    <label>Nome <input id="p-nome" required maxlength="255"></label>
-                    <label>Preço (R$) <input id="p-preco" type="number" step="0.01" min="0" required></label>
-                </div>
-                <label>Categoria <select id="p-cat">${PRATO_CATS.map((c) => `<option${c === 'Prato principal' ? ' selected' : ''}>${esc(c)}</option>`).join('')}</select></label>
-                <label>Descrição <textarea id="p-desc" rows="2" maxlength="2000" placeholder="Ingredientes, porção..."></textarea></label>
-                <label>URL da foto <input id="p-foto" type="url" placeholder="https://..."></label>`) : '');
+            + (dono ? formDono('add-prato', 'novo prato', camposPrato('')) : '');
     },
 
     async reservar(id, dono) {
@@ -523,13 +542,15 @@ function htmlPerfilRestaurante(p) {
     const restaurantes = p.restaurantes?.length
         ? `<div class="lista">${p.restaurantes.map((r) => `<div>
             <span><strong>${esc(r.nome)}</strong> · ${esc(r.categoria || 'Geral')}</span>
-            <span><button class="mini" data-abrir="${r.id}">Ver</button>
-            <button class="mini primario" data-acao="abrir-salao" data-id="${r.id}">Mesas</button></span></div>`).join('')}</div>`
+            <span><button class="mini" data-abrir="${r.id}" data-aba="cardapio">Ver</button>
+            <button class="mini primario" data-acao="abrir-cardapio" data-id="${r.id}">Cardápio</button>
+            <button class="mini" data-acao="abrir-salao" data-id="${r.id}">Mesas</button></span></div>`).join('')}</div>`
         : vazio('Você ainda não cadastrou um restaurante.');
     return `
         ${htmlCabecaPerfil(p, 'Restaurante')}
         <div class="numeros">
-            <button type="button" data-tela="tela-mesas"><strong>${c.restaurantes ?? 0}</strong><span>Restaurantes</span></button>
+            <button type="button" data-tela="tela-cardapio"><strong>Cardápio</strong><span>Pratos e notas</span></button>
+            <button type="button" data-tela="tela-mesas"><strong>${c.restaurantes ?? 0}</strong><span>Salões</span></button>
             <button type="button" data-tela="tela-reservas"><strong>Reservas</strong><span>Recebidas</span></button>
             <button type="button" data-tela="tela-avaliacoes"><strong>Avaliações</strong><span>Do salão e dos pratos</span></button>
             <button type="button" data-tela="tela-fila"><strong>Fila</strong><span>Chamar próximo</span></button>
@@ -669,6 +690,29 @@ async function carregarAvaliacoes() {
     });
 }
 
+async function carregarCardapio() {
+    if (!ehRestaurante()) { navegarPara(E.token ? 'tela-feed' : 'tela-login'); return; }
+    const c = $('lista-cardapio');
+    c.innerHTML = vazio('Carregando...');
+    await tentar(async () => {
+        const perfil = await api('/perfil');
+        const meus = perfil.restaurantes || [];
+        if (!meus.length) {
+            c.innerHTML = vazio('Publique o restaurante para montar o cardápio.') + '<button class="primario" data-tela="tela-cadastro">Cadastrar restaurante</button>';
+            return;
+        }
+        if (!E.salaoId || !meus.some((r) => r.id == E.salaoId)) E.salaoId = meus[0].id;
+        const info = meus.find((r) => r.id == E.salaoId);
+        const itens = await api(`/restaurantes/${E.salaoId}/cardapio`);
+        const escolha = meus.length > 1
+            ? `<label>Restaurante <select id="pg-cardapio-salao">${meus.map((r) => `<option value="${r.id}"${r.id == E.salaoId ? ' selected' : ''}>${esc(r.nome)}</option>`).join('')}</select></label>`
+            : `<p><strong>${esc(info.nome)}</strong></p>`;
+        c.innerHTML = escolha
+            + htmlCardapio(itens, true)
+            + formDono('add-prato-pagina', 'novo prato', camposPrato('pg-'));
+    });
+}
+
 async function carregarMesas() {
     if (ehRestaurante()) return carregarMesasDono();
     const lead = $('lead-mesas');
@@ -805,6 +849,7 @@ const ACOES = {
     },
     'mesa-status': async (b) => { await api(`/mesas/${b.dataset.id}`, { method: 'PATCH', corpo: { status: b.dataset.v } }); atualizarSalas(); },
     'abrir-salao'(b) { E.salaoId = +b.dataset.id; navegarPara('tela-mesas'); },
+    'abrir-cardapio'(b) { E.salaoId = +b.dataset.id; navegarPara('tela-cardapio'); },
     'mesa-sel'(b) {
         document.querySelectorAll('.assento.sel').forEach((el) => el.classList.remove('sel'));
         if (E.mesaSel == b.dataset.id) {
@@ -930,7 +975,15 @@ const FORMS = {
         await api(`/restaurantes/${E.r.id}/cardapio`, { method: 'POST', corpo: {
             nome: val('p-nome'), preco: val('p-preco'), categoria: $('p-cat').value,
             descricao: val('p-desc') || null, foto: val('p-foto') || null } });
+        toast('Prato adicionado ao cardápio.');
         mostrarAba('cardapio');
+    },
+    async 'add-prato-pagina'() {
+        await api(`/restaurantes/${E.salaoId}/cardapio`, { method: 'POST', corpo: {
+            nome: val('pg-p-nome'), preco: val('pg-p-preco'), categoria: $('pg-p-cat').value,
+            descricao: val('pg-p-desc') || null, foto: val('pg-p-foto') || null } });
+        toast('Prato adicionado ao cardápio.');
+        carregarCardapio();
     },
     async 'add-promo'() {
         await api(`/restaurantes/${E.r.id}/promocoes`, { method: 'POST', corpo: { titulo: val('pr-titulo'), banner_url: val('pr-banner') || null } });
@@ -978,7 +1031,9 @@ const FORMS = {
     async 'responder-prato'(f) {
         const id = f.dataset.id;
         await api(`/avaliacoes-pratos/${id}/resposta`, { method: 'PUT', corpo: { resposta: val(`rpp-${id}`) } });
-        toast('Resposta publicada!'); mostrarAba('cardapio');
+        toast('Resposta publicada!');
+        if (telaAtiva('tela-cardapio')) return carregarCardapio();
+        mostrarAba('cardapio');
     },
     async responder(f) {
         const id = f.dataset.id;
@@ -1018,6 +1073,7 @@ $('filtro-raio').addEventListener('change', () => {
 });
 document.addEventListener('change', (e) => {
     if (e.target.id === 'pg-salao') { E.salaoId = +e.target.value; E.mesaSel = null; carregarMesas(); }
+    if (e.target.id === 'pg-cardapio-salao') { E.salaoId = +e.target.value; carregarCardapio(); }
 });
 
 // ---------- Início ----------
