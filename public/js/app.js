@@ -299,7 +299,7 @@ async function abrirRestaurante(id, aba) {
         const voltar = $('btn-voltar-detalhe');
         if (voltar) {
             voltar.dataset.tela = ehRestaurante() ? 'tela-cardapio' : 'tela-feed';
-            voltar.textContent = ehRestaurante() ? '← Voltar ao cardápio' : '← Voltar aos restaurantes';
+            voltar.textContent = ehRestaurante() ? '← Voltar para Meu restaurante' : '← Voltar aos restaurantes';
         }
         const r = E.r;
         $('detalhe-topo').innerHTML = `
@@ -543,13 +543,13 @@ function htmlPerfilRestaurante(p) {
         ? `<div class="lista">${p.restaurantes.map((r) => `<div>
             <span><strong>${esc(r.nome)}</strong> · ${esc(r.categoria || 'Geral')}</span>
             <span><button class="mini" data-abrir="${r.id}" data-aba="cardapio">Ver</button>
-            <button class="mini primario" data-acao="abrir-cardapio" data-id="${r.id}">Cardápio</button>
+            <button class="mini primario" data-acao="abrir-cardapio" data-id="${r.id}">Meu restaurante</button>
             <button class="mini" data-acao="abrir-salao" data-id="${r.id}">Mesas</button></span></div>`).join('')}</div>`
         : vazio('Você ainda não cadastrou um restaurante.');
     return `
         ${htmlCabecaPerfil(p, 'Restaurante')}
         <div class="numeros">
-            <button type="button" data-tela="tela-cardapio"><strong>Cardápio</strong><span>Pratos e notas</span></button>
+            <button type="button" data-tela="tela-cardapio"><strong>Meu restaurante</strong><span>Pratos e notas</span></button>
             <button type="button" data-tela="tela-mesas"><strong>${c.restaurantes ?? 0}</strong><span>Salões</span></button>
             <button type="button" data-tela="tela-reservas"><strong>Reservas</strong><span>Recebidas</span></button>
             <button type="button" data-tela="tela-avaliacoes"><strong>Avaliações</strong><span>Do salão e dos pratos</span></button>
