@@ -8,11 +8,18 @@ API (Laravel + Sanctum) e front simples para avaliação e ranking de restaurant
 composer install
 cp .env.example .env
 php artisan key:generate
-touch database/database.sqlite
 php artisan migrate
 php artisan serve        # front em http://localhost:8000 (public/index.html)
 php artisan test         # testes
 ```
+
+O banco da aplicação é MySQL. Crie o banco `vago` e coloque no `.env` o usuário e a senha do seu MySQL (`DB_USERNAME` e `DB_PASSWORD`):
+
+```sql
+CREATE DATABASE vago CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+
+O `php artisan test` continua em um SQLite temporário na memória e não precisa desse servidor.
 
 ## Endpoints
 
