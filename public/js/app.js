@@ -3,7 +3,7 @@ const $ = (id) => document.getElementById(id);
 const E = {
     token: localStorage.getItem('vago_token'),
     user: JSON.parse(localStorage.getItem('vago_user') || 'null'),
-    favs: new Set(), r: null, aba: 'cardapio', rank: 'restaurantes', mesaSel: null, feed: 'lista',
+    favs: new Set(), r: null, aba: 'cardapio', mesaSel: null, feed: 'lista',
     geo: JSON.parse(localStorage.getItem('vago_geo') || 'null'),
 };
 
@@ -67,7 +67,7 @@ function navegarPara(id) {
     document.querySelectorAll('.tela').forEach((t) => t.classList.toggle('ativa', t.id === id));
     const nav = { 'tela-detalhe': 'tela-feed' }[id] || id;
     document.querySelectorAll('[data-nav]').forEach((b) => b.classList.toggle('on', b.dataset.nav === nav));
-    ({ 'tela-feed': () => carregarRestaurantes(), 'tela-ranking': carregarRanking,
+    ({ 'tela-feed': () => carregarRestaurantes(),
        'tela-favoritos': carregarFavoritos, 'tela-reservas': carregarReservas,
        'tela-perfil': carregarPerfil, 'tela-promocoes': carregarPromocoes,
        'tela-avaliacoes': carregarAvaliacoes, 'tela-mesas': carregarMesas,
@@ -236,20 +236,6 @@ function pedirLocal() {
 function notaTxt(avg, n) {
     return avg ? `★ ${Number(avg).toFixed(1)} <span class="mut">(${n})</span>` : '<span class="mut">Sem avaliações</span>';
 }
-async function carregarRanking() {
-    document.querySelectorAll('#abas-ranking button').forEach((b) => b.classList.toggle('on', b.dataset.rank === E.rank));
-    if (E.rank === 'pratos') return carregarRankingPratos();
-    await tentar(async () => {
-        const l = await api('/restaurantes/ranking');
-        $('lista-ranking').innerHTML = l.length ? l.map((r, i) => card(r, i + 1)).join('') : vazio('Nada por aqui ainda.');
-    });
-}
-async function carregarRankingPratos() {
-    await tentar(async () => {
-        const l = await api('/pratos/ranking');
-        $('lista-ranking').innerHTML = l.length ? l.map((p, i) => cardPratoRank(p, i + 1)).join('') : vazio('Ainda não há pratos avaliados.');
-    });
-}
 async function carregarFavoritos() {
     await tentar(async () => {
         const l = await api('/favoritos');
@@ -326,15 +312,7 @@ const cardPrato = (p, dono) => `<div class="card">
         : `<form data-acao="avaliar-prato" data-id="${p.id}">
             <div class="linha"><label>Nota <select id="ap-${p.id}">${[5, 4, 3, 2, 1].map((n) => `<option>${n}</option>`).join('')}</select></label>
             <button class="mini primario">Avaliar</button></div>
-            <label>Comentário <textarea id="ac-${p.id}" rows="2" maxlength="2000"></textarea></label></form>`) : ''}</div>`;
-const cardPratoRank = (p, pos) => `<div class="card">
-    <span class="selo">${esc(p.categoria || 'Outro')}</span>
-    <h3>${pos}º ${esc(p.nome)}</h3>
-    <p>${esc(p.restaurante?.nome || '')}</p>
-    ${p.descricao ? `<p>${esc(p.descricao)}</p>` : ''}
-    <div class="preco">${brl(p.preco)}</div>
-    <div class="nota">${notaTxt(p.avaliacoes_avg_nota, p.avaliacoes_count)}</div>
-    <button class="primario" data-abrir="${p.restaurante_id}">Ver restaurante</button></div>`;
+            <label>Comentário <textarea id="ac-${p.id}" rows="2" maxlength="2000"></textarea></label></form>`)         : ''}</div>`;
 
 const formDono = (acao, titulo, campos) => `<div class="dono"><strong>👑 Área do dono · ${titulo}</strong>
     <form data-acao="${acao}">${campos}<button class="primario">Adicionar</button></form></div>`;
@@ -847,11 +825,10 @@ async function alternarFavorito(id) {
 }
 
 document.addEventListener('click', (e) => {
-    const t = e.target.closest('[data-tela],[data-acao],[data-aba],[data-rank],[data-abrir],[data-fav],[data-pagina]');
+    const t = e.target.closest('[data-tela],[data-acao],[data-aba],[data-abrir],[data-fav],[data-pagina]');
     if (!t || t.tagName === 'FORM') return;
     const d = t.dataset;
     if (d.tela) navegarPara(d.tela);
-    else if (d.rank) { E.rank = d.rank; carregarRanking(); }
     else if (d.abrir) abrirRestaurante(d.abrir, d.aba);
     else if (d.aba) mostrarAba(d.aba);
     else if (d.fav) tentar(() => alternarFavorito(d.fav));
