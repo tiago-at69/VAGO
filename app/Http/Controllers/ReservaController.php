@@ -11,6 +11,8 @@ class ReservaController extends Controller
 {
     public function store(Request $request, Restaurante $restaurante)
     {
+        $request->user()->autorizarCliente();
+
         $dados = $request->validate([
             'mesa_id' => 'required|integer',
             'data' => 'required|date|after_or_equal:today',
@@ -46,6 +48,20 @@ class ReservaController extends Controller
     {
         return response()->json(
             Reserva::with('mesa.restaurante:id,nome')->where('user_id', $request->user()->id)->latest()->get()
+        );
+    }
+
+    public function recebidas(Request $request)
+    {
+        abort_unless($request->user()->ehRestaurante(), 403, 'As reservas recebidas são da conta do restaurante.');
+
+        $ids = $request->user()->restaurantes()->pluck('id');
+
+        return response()->json(
+            Reserva::with(['user:id,name,telefone', 'mesa:id,numero,cadeiras,restaurante_id', 'mesa.restaurante:id,nome'])
+                ->whereHas('mesa', fn ($q) => $q->whereIn('restaurante_id', $ids))
+                ->latest()
+                ->get()
         );
     }
 

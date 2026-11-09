@@ -14,7 +14,11 @@ class RestauranteRepository
     {
         $query = Restaurante::query()
             ->withAvg('avaliacoes', 'nota')
-            ->withCount('avaliacoes')
+            ->withCount([
+                'avaliacoes',
+                'mesas',
+                'mesas as mesas_livres_count' => fn ($q) => $q->where('status', 'livre'),
+            ])
             ->when($busca, fn ($q) => $q->where('nome', 'like', "%{$busca}%"))
             ->when($categoria, fn ($q) => $q->where('categoria', $categoria))
             ->when($notaMin, fn ($q) => $q->whereRaw(

@@ -14,7 +14,7 @@ class DominioTest extends TestCase
 
     private function restauranteComDono(): array
     {
-        $dono = User::factory()->create();
+        $dono = User::factory()->restaurante()->create();
 
         return [$dono, Restaurante::factory()->create(['user_id' => $dono->id])];
     }
@@ -71,6 +71,7 @@ class DominioTest extends TestCase
     public function test_fila_reordena_ao_sair_e_ao_chamar(): void
     {
         [$dono, $r] = $this->restauranteComDono();
+        Mesa::create(['restaurante_id' => $r->id, 'numero' => 1, 'cadeiras' => 4, 'status' => 'ocupada']);
         [$a, $b, $c] = User::factory()->count(3)->create();
 
         foreach ([$a, $b, $c] as $u) {
@@ -208,5 +209,107 @@ class DominioTest extends TestCase
             ->assertOk()
             ->assertJsonPath('picos.total', 4)
             ->assertJsonPath('picos.picos', ['sexta']);
+    }
+
+    public function test_cliente_nao_cadastra_restaurante_e_conta_de_salao_nasce_completa(): void
+    {
+        $this->actingAs(User::factory()->create(), 'sanctum')
+            ->postJson('/api/restaurantes', ['nome' => 'Cantina', 'endereco' => 'Rua A', 'categoria' => 'Italiana'])
+            ->assertForbidden();
+
+        $this->postJson('/api/cadastro/restaurante', [
+            'name' => 'João',
+            'email' => 'joao@salao.com',
+            'password' => 'senha1234',
+            'telefone' => '(31) 99999-9999',
+            'nome' => 'Salão do João',
+            'endereco' => 'Rua A, 10',
+            'tipo_culinaria' => 'Brasileira',
+            'capacidade_mesas' => 1,
+            'tempo_tolerancia' => '00:20:00',
+        ])->assertCreated()
+            ->assertJsonStructure(['token'])
+            ->assertJsonPath('usuario.tipo', 'restaurante')
+            ->assertJsonPath('restaurante.nome', 'Salão do João')
+            ->assertJsonPath('restaurante.categoria', 'Brasileira')
+            ->assertJsonPath('restaurante.capacidade_mesas', 1);
+
+        $dono = User::where('email', 'joao@salao.com')->first();
+        $salao = $dono->restaurantes()->first();
+
+        $this->actingAs($dono, 'sanctum')
+            ->postJson("/api/restaurantes/{$salao->id}/mesas", ['numero' => 1, 'cadeiras' => 4])
+            ->assertCreated();
+        $this->postJson("/api/restaurantes/{$salao->id}/mesas", ['numero' => 2, 'cadeiras' => 2])
+            ->assertUnprocessable();
+
+        $mesa = $salao->mesas()->first();
+        $this->patchJson("/api/mesas/{$mesa->id}", ['cadeiras' => 6])
+            ->assertOk()
+            ->assertJsonPath('cadeiras', 6);
+    }
+
+    public function test_fila_so_abre_com_o_salao_cheio(): void
+    {
+        [, $r] = $this->restauranteComDono();
+        $mesa = Mesa::create(['restaurante_id' => $r->id, 'numero' => 1, 'cadeiras' => 4, 'status' => 'livre']);
+        $cliente = User::factory()->create();
+
+        $this->actingAs($cliente, 'sanctum')
+            ->postJson("/api/restaurantes/{$r->id}/fila")
+            ->assertUnprocessable();
+
+        $mesa->update(['status' => 'ocupada']);
+
+        $this->postJson("/api/restaurantes/{$r->id}/fila")->assertCreated();
+        $this->getJson('/api/minha-fila')->assertOk()->assertJsonCount(1)->assertJsonPath('0.restaurante_id', $r->id);
+    }
+
+    public function test_promocoes_avaliacoes_reservas_e_fila_nos_dois_contextos(): void
+    {
+        [$dono, $r] = $this->restauranteComDono();
+        $mesa = Mesa::create(['restaurante_id' => $r->id, 'numero' => 1, 'cadeiras' => 4, 'status' => 'ocupada']);
+        $cliente = User::factory()->create();
+        $prato = $r->cardapios()->create(['nome' => 'Risoto', 'preco' => 48, 'categoria' => 'Prato principal']);
+
+        $this->actingAs($dono, 'sanctum')
+            ->postJson("/api/restaurantes/{$r->id}/promocoes", [
+                'titulo' => 'Happy hour',
+                'banner_url' => 'https://exemplo.com/banner.jpg',
+            ])->assertCreated();
+
+        $this->getJson('/api/promocoes')->assertOk()->assertJsonPath('0.titulo', 'Happy hour');
+
+        $this->actingAs($cliente, 'sanctum')
+            ->postJson("/api/restaurantes/{$r->id}/avaliacoes", ['nota' => 5, 'comentario' => 'Voltaria'])
+            ->assertCreated();
+        $this->postJson("/api/cardapios/{$prato->id}/avaliacoes", ['nota' => 4, 'comentario' => 'Bem servido'])
+            ->assertCreated();
+        $this->postJson("/api/restaurantes/{$r->id}/reservas", [
+            'mesa_id' => $mesa->id,
+            'data' => now()->addDay()->toDateString(),
+            'horario' => '21:00',
+            'num_pessoas' => 2,
+        ])->assertCreated();
+        $this->postJson("/api/restaurantes/{$r->id}/fila")->assertCreated();
+
+        $this->getJson('/api/minhas-avaliacoes')
+            ->assertOk()
+            ->assertJsonPath('contexto', 'cliente')
+            ->assertJsonCount(1, 'restaurantes')
+            ->assertJsonCount(1, 'pratos');
+        $this->getJson('/api/minhas-reservas')->assertOk()->assertJsonCount(1);
+        $this->getJson('/api/reservas-recebidas')->assertForbidden();
+
+        $this->actingAs($dono, 'sanctum')
+            ->postJson("/api/restaurantes/{$r->id}/avaliacoes", ['nota' => 5])
+            ->assertForbidden();
+        $this->getJson('/api/minhas-avaliacoes')
+            ->assertOk()
+            ->assertJsonPath('contexto', 'restaurante')
+            ->assertJsonCount(1, 'restaurantes')
+            ->assertJsonCount(1, 'pratos');
+        $this->getJson('/api/reservas-recebidas')->assertOk()->assertJsonCount(1);
+        $this->getJson('/api/fila-recebida')->assertOk()->assertJsonCount(1)->assertJsonPath('0.user_id', $cliente->id);
     }
 }

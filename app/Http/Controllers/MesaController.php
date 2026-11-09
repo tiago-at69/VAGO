@@ -19,6 +19,14 @@ class MesaController extends Controller
     public function store(Request $request, Restaurante $restaurante, PosicionarMesaService $posicao)
     {
         $restaurante->autorizarDono($request->user());
+
+        $capacidade = (int) $restaurante->capacidade_mesas;
+        if ($capacidade > 0 && $restaurante->mesas()->count() >= $capacidade) {
+            throw ValidationException::withMessages([
+                'numero' => "Este restaurante comporta no máximo {$capacidade} mesas.",
+            ]);
+        }
+
         $dados = $request->validate([
             'numero' => ['required', 'integer', 'min:1', Rule::unique('mesas')->where('restaurante_id', $restaurante->id)],
             'cadeiras' => 'required|integer|min:1|max:50',
@@ -39,6 +47,7 @@ class MesaController extends Controller
         $mesa->restaurante->autorizarDono($request->user());
         $dados = $request->validate([
             'status' => 'sometimes|required|in:livre,ocupada,reservada',
+            'cadeiras' => 'sometimes|required|integer|min:1|max:50',
             'pos_x' => 'required_with:pos_y|integer|min:0|max:'.Mesa::MAPA_MAX,
             'pos_y' => 'required_with:pos_x|integer|min:0|max:'.Mesa::MAPA_MAX,
         ]);

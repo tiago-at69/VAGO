@@ -29,8 +29,14 @@ class UserFactory extends Factory
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
+            'tipo' => User::TIPO_CLIENTE,
             'remember_token' => Str::random(10),
         ];
+    }
+
+    public function restaurante(): static
+    {
+        return $this->state(fn () => ['tipo' => User::TIPO_RESTAURANTE]);
     }
 
     /**

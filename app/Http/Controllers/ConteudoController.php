@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AvaliacaoPrato;
 use App\Models\Cardapio;
+use App\Models\Promocao;
 use App\Models\Restaurante;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -44,6 +45,13 @@ class ConteudoController extends Controller
         $dados['categoria'] = $dados['categoria'] ?? 'Outro';
 
         return response()->json($restaurante->cardapios()->create($dados), 201);
+    }
+
+    public function listar()
+    {
+        return response()->json(
+            Promocao::with('restaurante:id,nome,categoria,endereco')->latest()->get()
+        );
     }
 
     public function promocoes(Restaurante $restaurante)

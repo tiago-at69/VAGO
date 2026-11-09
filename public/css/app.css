@@ -65,11 +65,13 @@ a { color: inherit; }
     position: sticky;
     top: 0;
     z-index: 20;
-    height: var(--topo);
+    height: auto;
+    min-height: var(--topo);
     display: flex;
     align-items: center;
-    gap: 1.5rem;
-    padding: 0 2.2rem;
+    flex-wrap: wrap;
+    gap: .45rem 1.1rem;
+    padding: .7rem 1.6rem;
     background: var(--ink);
     color: #fff;
 }
@@ -87,7 +89,7 @@ a { color: inherit; }
     line-height: 1;
 }
 .pin { width: .72em; height: .96em; display: block; margin-left: .02em; }
-.menu { display: flex; align-items: center; gap: .35rem; margin-left: auto; }
+.menu { display: flex; align-items: center; gap: .35rem; margin-left: auto; flex: 1; min-width: 0; overflow-x: auto; }
 .menu button, .rodape-nav button, .acoes .ghost, .voltar {
     background: transparent;
     border: 1px solid transparent;
@@ -128,6 +130,7 @@ a { color: inherit; }
     letter-spacing: .02em;
 }
 .icone:hover { background: rgba(255,255,255,.08); }
+.tipo-conta { color: rgba(255,255,255,.72); font-size: .82rem; white-space: nowrap; }
 
 main { min-height: calc(100vh - 320px); }
 .tela { display: none; }
@@ -380,6 +383,30 @@ input:read-only, input:disabled { opacity: .72; }
 .duas { display: flex; gap: 1.2rem; flex-wrap: wrap; margin-top: 1.4rem; }
 .duas > .painel { flex: 1; min-width: 280px; }
 form { display: flex; flex-direction: column; gap: .8rem; margin-top: .8rem; }
+form.em-linha { flex-direction: row; align-items: center; margin: 0; gap: .35rem; }
+form.em-linha input { width: 4.2rem; margin: 0; padding: .35rem .4rem; }
+.escolha { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 1.2rem; }
+.escolha button {
+    flex: 1;
+    min-width: 220px;
+    text-align: left;
+    background: var(--sf);
+    color: var(--tx);
+    border: 1px solid var(--borda);
+    border-radius: var(--r);
+    padding: 1.15rem 1.25rem;
+    box-shadow: none;
+}
+.escolha strong { display: block; font-size: 1.05rem; margin-bottom: .25rem; }
+.escolha span { color: var(--mut); font-weight: 400; font-size: .92rem; }
+.aviso {
+    background: var(--chip-warn);
+    color: var(--chip-warn-tx);
+    border-radius: var(--r);
+    padding: 1rem 1.1rem;
+    margin: 1rem 0;
+}
+.aviso p { margin: .35rem 0 .8rem; }
 label { font-size: .85rem; font-weight: 600; display: block; }
 label input, label select, label textarea { width: 100%; margin-top: .3rem; font-weight: 400; }
 .linha { display: flex; gap: .6rem; flex-wrap: wrap; align-items: flex-end; }

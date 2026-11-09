@@ -16,6 +16,7 @@ class ObterPerfilService
             'email' => $user->email,
             'cpf' => $user->cpf,
             'telefone' => $user->telefone,
+            'tipo' => $user->tipo ?: User::TIPO_CLIENTE,
             'created_at' => $user->created_at,
             'contagens' => [
                 'restaurantes' => $user->restaurantes_count,
@@ -32,7 +33,12 @@ class ObterPerfilService
                 ->with('restaurante:id,nome')
                 ->latest()
                 ->take(10)
-                ->get(['id', 'restaurante_id', 'nota', 'comentario', 'created_at']),
+                ->get(['id', 'restaurante_id', 'nota', 'comentario', 'resposta', 'respondida_em', 'created_at']),
+            'avaliacoes_pratos' => $user->avaliacoesPratos()
+                ->with(['prato:id,nome,restaurante_id', 'prato.restaurante:id,nome'])
+                ->latest()
+                ->take(10)
+                ->get(),
         ];
     }
 }

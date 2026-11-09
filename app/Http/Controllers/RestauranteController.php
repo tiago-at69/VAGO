@@ -16,6 +16,16 @@ class RestauranteController extends Controller
     // Funcionalidade 4: Cadastrar
     public function store(Request $request, CadastrarRestauranteService $service)
     {
+        abort_unless(
+            $request->user()->ehRestaurante(),
+            403,
+            'Só uma conta de restaurante pode cadastrar um salão.'
+        );
+
+        if ($request->filled('tipo_culinaria') && ! $request->filled('categoria')) {
+            $request->merge(['categoria' => $request->input('tipo_culinaria')]);
+        }
+
         $dados = $request->validate([
             'nome' => 'required|string|max:255',
             'endereco' => 'required|string|max:255',
@@ -23,7 +33,7 @@ class RestauranteController extends Controller
             'descricao' => 'nullable|string|max:2000',
             'categoria' => ['nullable', Rule::in(Restaurante::CATEGORIAS)],
             'capacidade_mesas' => 'nullable|integer|min:0',
-            'tempo_tolerancia' => 'nullable|date_format:H:i',
+            'tempo_tolerancia' => ['nullable', 'regex:/^\d{2}:\d{2}(:\d{2})?$/'],
             'latitude' => 'nullable|required_with:longitude|numeric|between:-90,90',
             'longitude' => 'nullable|required_with:latitude|numeric|between:-180,180',
         ]);
@@ -59,10 +69,15 @@ class RestauranteController extends Controller
     // Funcionalidade 6: Buscar por ID
     public function show(Restaurante $restaurante, CalcularDiasPicoService $picos)
     {
-        $restaurante->loadAvg('avaliacoes', 'nota')->loadCount('avaliacoes');
+        $restaurante->loadAvg('avaliacoes', 'nota')->loadCount([
+            'avaliacoes',
+            'mesas',
+            'mesas as mesas_livres_count' => fn ($q) => $q->where('status', 'livre'),
+        ]);
 
         return response()->json($restaurante->toArray() + [
             'picos' => $picos->executar($restaurante),
+            'cheio' => $restaurante->mesas_count > 0 && (int) $restaurante->mesas_livres_count === 0,
         ]);
     }
 
