@@ -49,14 +49,20 @@ function aplicarTema(tema) {
     localStorage.setItem('vago_tema', tema);
     const b = $('btn-tema');
     const escuro = tema === 'escuro';
-    b.textContent = escuro ? '☀ Claro' : '☾ Escuro';
+    b.querySelector('.ico-lua').hidden = escuro;
+    b.querySelector('.ico-sol').hidden = !escuro;
     b.setAttribute('aria-pressed', escuro);
     b.title = escuro ? 'Ativar modo claro' : 'Ativar modo escuro';
+    b.setAttribute('aria-label', b.title);
 }
 
 // ---------- Navegação ----------
+const PROTEGIDAS = new Set(['tela-favoritos', 'tela-reservas', 'tela-perfil', 'tela-cadastro']);
 function navegarPara(id) {
+    if (PROTEGIDAS.has(id) && !E.token) id = 'tela-login';
     document.querySelectorAll('.tela').forEach((t) => t.classList.toggle('ativa', t.id === id));
+    const nav = { 'tela-detalhe': 'tela-feed' }[id] || id;
+    document.querySelectorAll('[data-nav]').forEach((b) => b.classList.toggle('on', b.dataset.nav === nav));
     ({ 'tela-feed': () => carregarRestaurantes(), 'tela-ranking': carregarRanking,
        'tela-favoritos': carregarFavoritos, 'tela-reservas': carregarMinhasReservas,
        'tela-perfil': carregarPerfil })[id]?.();
@@ -71,17 +77,29 @@ function atualizarConta() {
 }
 
 // ---------- Restaurantes ----------
+const FOTOS = {
+    Italiana: 'img/massas.jpg',
+    Pizzaria: 'img/massas.jpg',
+    Japonesa: 'img/oriental.jpg',
+    'Árabe': 'img/oriental.jpg',
+    Brasileira: 'img/brasa.jpg',
+    Hamburgueria: 'img/brasa.jpg',
+    Mexicana: 'img/brasa.jpg',
+};
+const fotoDe = (r) => FOTOS[r.categoria] || 'img/hero.jpg';
 function card(r, pos) {
     const nota = notaTxt(r.avaliacoes_avg_nota, r.avaliacoes_count);
-    return `<div class="card">
-        ${E.token ? `<button class="fav ${E.favs.has(r.id) ? 'on' : ''}" data-fav="${r.id}" title="Favoritar">♥</button>` : ''}
-        <span class="selo">${esc(r.categoria || 'Geral')}</span>
+    return `<article class="card">
+        <div class="card-foto" style="background-image:url('${fotoDe(r)}')">
+            ${E.token ? `<button class="fav ${E.favs.has(r.id) ? 'on' : ''}" data-fav="${r.id}" title="Favoritar">♥</button>` : ''}
+            <span class="selo">${esc(r.categoria || 'Geral')}</span>
+        </div>
         <h3>${pos ? pos + 'º ' : ''}${esc(r.nome)}</h3>
-        <p>📍 ${esc(r.endereco)}${r.distancia_km != null ? ` · ${fmtKm(r.distancia_km)}` : ''}</p>
+        <p>${esc(r.endereco)}${r.distancia_km != null ? ` · ${fmtKm(r.distancia_km)}` : ''}</p>
         ${r.descricao ? `<p>${esc(r.descricao)}</p>` : ''}
         <div class="nota">${nota}</div>
         <button class="primario" data-abrir="${r.id}">Ver detalhes</button>
-    </div>`;
+    </article>`;
 }
 const vazio = (msg) => `<p class="mut">${msg}</p>`;
 const htmlResposta = (x) => x.resposta
@@ -153,7 +171,7 @@ async function carregarRestaurantes(pagina = 1) {
     await tentar(async () => {
         const r = await api('/restaurantes?' + p);
         const btn = $('btn-feed-mapa');
-        if (btn) btn.textContent = E.feed === 'mapa' ? '☰ Lista' : '🗺 Mapa';
+        if (btn) btn.textContent = E.feed === 'mapa' ? 'Lista' : 'Mapa';
         c.className = E.feed === 'mapa' ? '' : 'grid';
         c.innerHTML = E.feed === 'mapa'
             ? htmlMapaFeed(r.data)
@@ -170,7 +188,7 @@ const fmtKm = (km) => Number(km) < 1
 function atualizarBtnLocal() {
     const b = $('btn-local');
     if (!b) return;
-    b.textContent = E.geo ? '📍 Local ativo' : '📍 Perto de mim';
+    b.textContent = E.geo ? 'Local ativo' : 'Perto de mim';
     b.classList.toggle('primario', !!E.geo);
 }
 function guardarGeo(geo) {
@@ -460,7 +478,7 @@ async function sair(chamar = true) {
     if (chamar && E.token) await api('/logout', { method: 'POST' }).catch(() => {});
     E.token = null; E.user = null; E.favs = new Set();
     localStorage.removeItem('vago_token'); localStorage.removeItem('vago_user');
-    atualizarConta(); navegarPara('tela-feed');
+    atualizarConta(); navegarPara('tela-inicio');
 }
 
 // ---------- Ações (cliques) ----------
@@ -473,6 +491,12 @@ const ACOES = {
     },
     'usar-local': () => { E.geo ? (guardarGeo(null), carregarRestaurantes()) : pedirLocal(); },
     'ver-mapa': () => { E.feed = E.feed === 'mapa' ? 'lista' : 'mapa'; carregarRestaurantes(); },
+    estilo(b) {
+        $('busca-nome').value = '';
+        $('filtro-nota').value = '';
+        $('filtro-categoria').value = b.dataset.categoria || '';
+        navegarPara('tela-feed');
+    },
     'mapa-foco'(b) {
         E.mapaFoco = b.dataset.id;
         const frame = $('mapa-iframe'), q = b.dataset.q;
@@ -627,5 +651,4 @@ $('filtro-raio').addEventListener('change', () => {
 aplicarTema(temaAtual());
 atualizarConta();
 carregarCategorias();
-carregarRestaurantes();
-if (E.token) api('/favoritos').then((l) => { E.favs = new Set(l.map((x) => x.id)); carregarRestaurantes(); }).catch(() => {});
+if (E.token) api('/favoritos').then((l) => { E.favs = new Set(l.map((x) => x.id)); }).catch(() => {});
