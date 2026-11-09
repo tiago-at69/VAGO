@@ -1,4 +1,5 @@
-const API = '/api';
+// Mesmo caminho da página (funciona na raiz e em /public), não só em /api na raiz do domínio.
+const API = new URL('api', document.baseURI).pathname.replace(/\/$/, '');
 const $ = (id) => document.getElementById(id);
 const E = {
     token: localStorage.getItem('vago_token'),
@@ -25,19 +26,46 @@ let toastTimer;
 function toast(msg, erro = false) {
     const t = $('toast');
     t.textContent = msg; t.className = erro ? 'erro' : ''; t.hidden = false;
-    clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), 3200);
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), erro ? 7000 : 3200);
+}
+
+const SEM_TOKEN = new Set(['/login', '/usuarios', '/cadastro/restaurante']);
+
+function textoErro(res, dados, bruto) {
+    let lista = [];
+    if (dados && dados.errors && typeof dados.errors === 'object') {
+        lista = Object.values(dados.errors).flatMap((item) => (Array.isArray(item) ? item : [item])).filter(Boolean);
+    }
+    const dito = String((lista[0] || dados?.erro || dados?.message || '')).trim();
+    if (/sqlstate|no such column|unknown column|has no column/i.test(dito)) {
+        return 'Não consegui gravar no banco. Rode php artisan migrate e tente de novo.';
+    }
+    if (dito && !/^server error$/i.test(dito)) return dito;
+    const html = !bruto || bruto.trim().startsWith('<');
+    if (html || res.status === 404) {
+        return 'Não encontrei a API. Abra o VAGO com php artisan serve, em http://127.0.0.1:8000.';
+    }
+    if (res.status === 429) return 'Muitas tentativas. Espere um minuto e tente de novo.';
+    if (res.status >= 500) return 'Erro no servidor. Se a conta não entrou, rode php artisan migrate.';
+    return `Não foi possível concluir (${res.status}).`;
 }
 
 async function api(caminho, { method = 'GET', corpo } = {}) {
     const headers = { Accept: 'application/json' };
     if (corpo) headers['Content-Type'] = 'application/json';
-    if (E.token) headers.Authorization = `Bearer ${E.token}`;
-    const res = await fetch(API + caminho, { method, headers, body: corpo ? JSON.stringify(corpo) : undefined });
-    const dados = await res.json().catch(() => ({}));
+    if (E.token && !SEM_TOKEN.has(caminho)) headers.Authorization = `Bearer ${E.token}`;
+    let res;
+    try {
+        res = await fetch(API + caminho, { method, headers, body: corpo ? JSON.stringify(corpo) : undefined });
+    } catch (e) {
+        throw new Error('Não consegui falar com o servidor. Rode php artisan serve e abra http://127.0.0.1:8000.');
+    }
+    const bruto = await res.text();
+    let dados = {};
+    try { dados = bruto ? JSON.parse(bruto) : {}; } catch (e) { dados = {}; }
     if (!res.ok) {
-        if (res.status === 401 && E.token) sair(false);
-        const primeiro = dados.errors ? Object.values(dados.errors)[0][0] : null;
-        throw new Error(primeiro || dados.erro || dados.message || 'Erro na requisição.');
+        if (res.status === 401 && E.token && !SEM_TOKEN.has(caminho)) sair(false);
+        throw new Error(textoErro(res, dados, bruto));
     }
     return dados;
 }
@@ -244,12 +272,12 @@ async function carregarFavoritos() {
     });
 }
 async function carregarCategorias() {
-    await tentar(async () => {
+    try {
         const cs = await api('/restaurantes/categorias');
         const op = cs.map((c) => `<option>${esc(c)}</option>`).join('');
         $('filtro-categoria').innerHTML = '<option value="">Todas as categorias</option>' + op;
         $('cad-categoria').innerHTML = op;
-    });
+    } catch (e) { /* o HTML já traz as opções */ }
 }
 
 // ---------- Detalhe do restaurante ----------
@@ -836,6 +864,16 @@ document.addEventListener('click', (e) => {
     else if (d.acao && ACOES[d.acao]) tentar(() => ACOES[d.acao](t));
 });
 
+function entrarCom(r) {
+    const usuario = r?.usuario || r;
+    if (!r?.token || !usuario?.name) return null;
+    E.token = r.token;
+    guardarUsuario(usuario);
+    localStorage.setItem('vago_token', r.token);
+    E.favs = new Set();
+    return usuario;
+}
+
 // ---------- Formulários ----------
 const FORMS = {
     async login(f) {
@@ -853,16 +891,12 @@ const FORMS = {
         const password = $('u-senha').value;
         const cpf = val('u-cpf').replace(/\D/g, '');
         if (cpf && cpf.length !== 11) { toast('O CPF precisa ter 11 dígitos.', true); return; }
-        await api('/usuarios', { method: 'POST', corpo: {
+        const r = await api('/usuarios', { method: 'POST', corpo: {
             name: val('u-nome'), email, password,
             cpf: cpf || null, telefone: val('u-tel') || null } });
-        const r = await api('/login', { method: 'POST', corpo: { email, password } });
-        E.token = r.token;
-        guardarUsuario(r.usuario);
-        localStorage.setItem('vago_token', r.token);
+        const usuario = entrarCom(r) || entrarCom(await api('/login', { method: 'POST', corpo: { email, password } }));
         f.reset();
-        E.favs = new Set();
-        toast(`Conta criada, ${r.usuario.name}!`);
+        toast(`Conta criada, ${usuario.name}!`);
         navegarPara('tela-perfil');
     },
     async 'cad-restaurante'(f) {
@@ -885,14 +919,10 @@ const FORMS = {
         }
         const email = val('cad-email');
         const password = $('cad-senha').value;
-        await api('/cadastro/restaurante', { method: 'POST', corpo: {
+        const r = await api('/cadastro/restaurante', { method: 'POST', corpo: {
             name: val('cad-responsavel'), email, password, ...restaurante } });
-        const r = await api('/login', { method: 'POST', corpo: { email, password } });
-        E.token = r.token;
-        guardarUsuario(r.usuario);
-        localStorage.setItem('vago_token', r.token);
+        if (!entrarCom(r)) entrarCom(await api('/login', { method: 'POST', corpo: { email, password } }));
         f.reset();
-        E.favs = new Set();
         toast('Restaurante cadastrado. Agora você pode montar as mesas.');
         navegarPara('tela-mesas');
     },

@@ -18,8 +18,8 @@ php artisan test         # testes
 
 | Método | Rota | Auth |
 |---|---|---|
-| POST | `/api/usuarios` (conta de cliente; `tipo=cliente`) | não |
-| POST | `/api/cadastro/restaurante` (conta + salão; `tipo=restaurante`) | não |
+| POST | `/api/usuarios` (conta de cliente; `tipo=cliente`; devolve `token`) | não |
+| POST | `/api/cadastro/restaurante` (conta + salão; `tipo=restaurante`; devolve `token`) | não |
 | POST | `/api/login` (devolve `token`, limite 5/min) | não |
 | POST | `/api/logout` | Bearer |
 | GET · PATCH | `/api/perfil` (ver / editar nome e telefone) | Bearer |

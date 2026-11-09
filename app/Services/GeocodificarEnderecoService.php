@@ -23,7 +23,7 @@ class GeocodificarEnderecoService
 
     private function peloGoogle(string $endereco): ?array
     {
-        $json = Http::timeout(6)->acceptJson()->get('https://maps.googleapis.com/maps/api/geocode/json', [
+        $json = Http::connectTimeout(3)->timeout(6)->acceptJson()->get('https://maps.googleapis.com/maps/api/geocode/json', [
             'address' => $endereco,
             'key' => config('services.google.maps_key'),
             'language' => 'pt-BR',
@@ -36,7 +36,7 @@ class GeocodificarEnderecoService
 
     private function peloNominatim(string $endereco): ?array
     {
-        $json = Http::timeout(6)
+        $json = Http::connectTimeout(3)->timeout(6)
             ->withHeaders(['User-Agent' => 'VAGO/1.0 (mapa de restaurantes)'])
             ->acceptJson()
             ->get('https://nominatim.openstreetmap.org/search', [

@@ -228,6 +228,7 @@ class DominioTest extends TestCase
             'capacidade_mesas' => 1,
             'tempo_tolerancia' => '00:20:00',
         ])->assertCreated()
+            ->assertJsonStructure(['token'])
             ->assertJsonPath('usuario.tipo', 'restaurante')
             ->assertJsonPath('restaurante.nome', 'Salão do João')
             ->assertJsonPath('restaurante.categoria', 'Brasileira')

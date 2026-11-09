@@ -9,6 +9,7 @@ use App\Services\AutenticarUsuarioService;
 use App\Services\CadastrarContaRestauranteService;
 use App\Services\CadastrarUsuarioService;
 use App\Services\ObterPerfilService;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
@@ -26,10 +27,10 @@ class AuthController extends Controller
             'password' => ['required', 'string', Password::min(8)],
             'cpf' => 'nullable|digits:11|unique:users',
             'telefone' => 'nullable|string|max:30',
-        ]);
+        ], $this->mensagensCadastro());
         $dados['tipo'] = User::TIPO_CLIENTE;
 
-        return response()->json($service->executar($dados), 201);
+        return $this->respostaDeCadastro(fn () => $service->executar($dados));
     }
 
     // Conta de restaurante: responsável + salão, sem precisar já estar logado.
@@ -50,9 +51,9 @@ class AuthController extends Controller
             'categoria' => ['nullable', Rule::in(Restaurante::CATEGORIAS)],
             'capacidade_mesas' => 'nullable|integer|min:0',
             'tempo_tolerancia' => ['nullable', 'regex:/^\d{2}:\d{2}(:\d{2})?$/'],
-        ]);
+        ], $this->mensagensCadastro());
 
-        return response()->json($service->executar($dados), 201);
+        return $this->respostaDeCadastro(fn () => $service->executar($dados));
     }
 
     // Funcionalidade 2: Autenticar (devolve token Sanctum)
@@ -103,6 +104,58 @@ class AuthController extends Controller
     public function perfil(User $user)
     {
         return response()->json($user->only(['id', 'name', 'created_at']));
+    }
+
+    /** Grava a conta e já devolve o token, para o front não depender de um segundo login. */
+    private function respostaDeCadastro(callable $criar)
+    {
+        try {
+            $resultado = $criar();
+        } catch (QueryException $e) {
+            report($e);
+
+            return response()->json([
+                'erro' => 'Não consegui gravar a conta. Rode php artisan migrate e tente de novo.',
+            ], 500);
+        }
+
+        $usuario = $resultado instanceof User ? $resultado : $resultado['usuario'];
+        $extra = $resultado instanceof User ? [] : ['restaurante' => $resultado['restaurante']];
+        $mensagem = $resultado instanceof User ? 'Conta criada.' : ($resultado['mensagem'] ?? 'Conta criada.');
+
+        try {
+            $token = $usuario->createToken('app')->plainTextToken;
+        } catch (QueryException $e) {
+            report($e);
+
+            return response()->json([
+                'erro' => 'A conta foi gravada, mas a sessão não. Rode php artisan migrate e entre com o e-mail.',
+            ], 500);
+        }
+
+        return response()->json([
+            'mensagem' => $mensagem,
+            'usuario' => $usuario,
+            'token' => $token,
+        ] + $extra, 201);
+    }
+
+    private function mensagensCadastro(): array
+    {
+        return [
+            'name.required' => 'Informe o nome.',
+            'email.required' => 'Informe o e-mail.',
+            'email.email' => 'O e-mail não é válido.',
+            'email.unique' => 'Esse e-mail já está cadastrado.',
+            'password.required' => 'Informe a senha.',
+            'password.min' => 'A senha precisa ter no mínimo 8 caracteres.',
+            'cpf.digits' => 'O CPF precisa ter 11 dígitos.',
+            'cpf.unique' => 'Esse CPF já está cadastrado.',
+            'nome.required' => 'Informe o nome do restaurante.',
+            'endereco.required' => 'Informe o endereço.',
+            'categoria.in' => 'Escolha um tipo de culinária da lista.',
+            'tempo_tolerancia.regex' => 'A tolerância deve estar no formato HH:MM.',
+        ];
     }
 
     private function normalizarCpf(Request $request): void

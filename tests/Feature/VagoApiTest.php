@@ -16,7 +16,8 @@ class VagoApiTest extends TestCase
     {
         $this->postJson('/api/usuarios', [
             'name' => 'Ana', 'email' => 'ana@example.com', 'password' => 'senha1234', 'cpf' => '123.456.789-09',
-        ])->assertCreated()->assertJsonMissing(['password'])->assertJsonPath('tipo', 'cliente')->assertJsonPath('cpf', '12345678909');
+        ])->assertCreated()->assertJsonMissing(['password'])->assertJsonPath('usuario.tipo', 'cliente')
+            ->assertJsonPath('usuario.cpf', '12345678909')->assertJsonStructure(['token', 'usuario']);
 
         $this->postJson('/api/login', ['email' => 'ana@example.com', 'password' => 'senha1234'])
             ->assertOk()->assertJsonStructure(['token', 'usuario']);
@@ -34,7 +35,7 @@ class VagoApiTest extends TestCase
     {
         $this->postJson('/api/usuarios', [
             'name' => 'Ana', 'email' => 'ana@example.com', 'password' => '123',
-        ])->assertUnprocessable();
+        ])->assertUnprocessable()->assertJsonPath('errors.password.0', 'A senha precisa ter no mínimo 8 caracteres.');
     }
 
     public function test_cadastrar_restaurante_exige_autenticacao(): void
