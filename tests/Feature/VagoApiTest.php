@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Restaurante;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class VagoApiTest extends TestCase
@@ -14,8 +15,8 @@ class VagoApiTest extends TestCase
     public function test_cadastra_usuario_e_faz_login_com_token(): void
     {
         $this->postJson('/api/usuarios', [
-            'name' => 'Ana', 'email' => 'ana@example.com', 'password' => 'senha1234',
-        ])->assertCreated()->assertJsonMissing(['password']);
+            'name' => 'Ana', 'email' => 'ana@example.com', 'password' => 'senha1234', 'cpf' => '123.456.789-09',
+        ])->assertCreated()->assertJsonMissing(['password'])->assertJsonPath('tipo', 'cliente')->assertJsonPath('cpf', '12345678909');
 
         $this->postJson('/api/login', ['email' => 'ana@example.com', 'password' => 'senha1234'])
             ->assertOk()->assertJsonStructure(['token', 'usuario']);
@@ -43,10 +44,11 @@ class VagoApiTest extends TestCase
 
     public function test_cadastra_restaurante_autenticado_e_valida_categoria(): void
     {
-        $this->actingAs(User::factory()->create(), 'sanctum');
+        $this->actingAs(User::factory()->restaurante()->create(), 'sanctum');
 
         $this->postJson('/api/restaurantes', ['nome' => 'Cantina', 'endereco' => 'Rua A', 'categoria' => 'Italiana'])
-            ->assertCreated();
+            ->assertCreated()
+            ->assertJsonPath('tipo_culinaria', 'Italiana');
         $this->postJson('/api/restaurantes', ['nome' => 'Outro', 'endereco' => 'Rua B', 'categoria' => 'Inventada'])
             ->assertUnprocessable();
     }
@@ -54,13 +56,13 @@ class VagoApiTest extends TestCase
     public function test_cadastro_grava_coordenadas_do_endereco(): void
     {
         config(['services.geocode.enabled' => true, 'services.google.maps_key' => 'teste']);
-        \Illuminate\Support\Facades\Http::fake([
-            'maps.googleapis.com/*' => \Illuminate\Support\Facades\Http::response([
+        Http::fake([
+            'maps.googleapis.com/*' => Http::response([
                 'status' => 'OK',
                 'results' => [['geometry' => ['location' => ['lat' => -23.5505, 'lng' => -46.6333]]]],
             ]),
         ]);
-        $this->actingAs(User::factory()->create(), 'sanctum')
+        $this->actingAs(User::factory()->restaurante()->create(), 'sanctum')
             ->postJson('/api/restaurantes', ['nome' => 'Cantina', 'endereco' => 'Praça da Sé, São Paulo', 'categoria' => 'Italiana'])
             ->assertCreated()
             ->assertJsonPath('latitude', -23.5505)
@@ -69,7 +71,7 @@ class VagoApiTest extends TestCase
 
     public function test_cadastro_aceita_coordenadas_manuais(): void
     {
-        $this->actingAs(User::factory()->create(), 'sanctum')
+        $this->actingAs(User::factory()->restaurante()->create(), 'sanctum')
             ->postJson('/api/restaurantes', [
                 'nome' => 'Cantina', 'endereco' => 'Rua A', 'categoria' => 'Italiana',
                 'latitude' => -22.9, 'longitude' => -43.2,

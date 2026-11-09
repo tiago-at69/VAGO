@@ -22,9 +22,17 @@ class CadastrarRestauranteService
             'categoria' => $dados['categoria'] ?? 'Geral',
             'user_id' => $userId,
             'capacidade_mesas' => $dados['capacidade_mesas'] ?? 0,
-            'tempo_tolerancia' => ($dados['tempo_tolerancia'] ?? '00:15') . ':00',
+            'tempo_tolerancia' => $this->tolerancia($dados['tempo_tolerancia'] ?? null),
             'latitude' => $coords['latitude'] ?? null,
             'longitude' => $coords['longitude'] ?? null,
         ]);
+    }
+
+    /** Aceita HH:MM ou HH:MM:SS e grava sempre com segundos. */
+    private function tolerancia(?string $valor): string
+    {
+        $valor = substr($valor ?: '00:15', 0, 5);
+
+        return $valor.':00';
     }
 }

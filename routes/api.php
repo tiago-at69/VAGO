@@ -13,7 +13,9 @@ use Illuminate\Support\Facades\Route;
 
 // Públicas ---------------------------------------------------------------
 Route::post('/usuarios', [AuthController::class, 'cadastrar']);
+Route::post('/cadastro/restaurante', [AuthController::class, 'cadastrarRestaurante']);
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
+Route::get('/promocoes', [ConteudoController::class, 'listar']);
 
 // Rotas fixas ANTES de /restaurantes/{restaurante}
 Route::get('/restaurantes', [RestauranteController::class, 'index']);
@@ -44,6 +46,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/restaurantes', [RestauranteController::class, 'store']);
     Route::get('/favoritos', [FavoritoController::class, 'index']);
     Route::get('/minhas-reservas', [ReservaController::class, 'minhas']);
+    Route::get('/reservas-recebidas', [ReservaController::class, 'recebidas']);
+    Route::get('/minhas-avaliacoes', [AvaliacaoController::class, 'minhas']);
+    Route::get('/minha-fila', [FilaController::class, 'minha']);
+    Route::get('/fila-recebida', [FilaController::class, 'recebida']);
     Route::patch('/mesas/{mesa}', [MesaController::class, 'atualizar']);
     Route::patch('/reservas/{reserva}', [ReservaController::class, 'atualizar']);
     Route::put('/avaliacoes/{avaliacao}/resposta', [AvaliacaoController::class, 'responder']);

@@ -13,7 +13,11 @@ class User extends Authenticatable
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
 
-    protected $fillable = ['name', 'email', 'password', 'cpf', 'telefone'];
+    public const TIPO_CLIENTE = 'cliente';
+
+    public const TIPO_RESTAURANTE = 'restaurante';
+
+    protected $fillable = ['name', 'email', 'password', 'cpf', 'telefone', 'tipo'];
 
     protected $hidden = ['password', 'remember_token'];
 
@@ -48,5 +52,20 @@ class User extends Authenticatable
     public function reservas()
     {
         return $this->hasMany(Reserva::class);
+    }
+
+    public function ehRestaurante(): bool
+    {
+        return $this->tipo === self::TIPO_RESTAURANTE;
+    }
+
+    /** Reservar, avaliar, favoritar e entrar na fila são ações de cliente. */
+    public function autorizarCliente(): void
+    {
+        abort_unless(
+            ! $this->ehRestaurante(),
+            403,
+            'Esta ação é feita com uma conta de cliente.'
+        );
     }
 }

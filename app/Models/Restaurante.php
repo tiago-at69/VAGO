@@ -24,6 +24,8 @@ class Restaurante extends Model
 
     protected $fillable = ['nome', 'endereco', 'telefone', 'descricao', 'categoria', 'user_id', 'capacidade_mesas', 'tempo_tolerancia', 'latitude', 'longitude'];
 
+    protected $appends = ['tipo_culinaria'];
+
     protected function casts(): array
     {
         return [
@@ -37,10 +39,40 @@ class Restaurante extends Model
         return $this->hasMany(Avaliacao::class);
     }
 
-    public function cardapios() { return $this->hasMany(Cardapio::class); }
-    public function mesas() { return $this->hasMany(Mesa::class); }
-    public function promocoes() { return $this->hasMany(Promocao::class); }
-    public function fila() { return $this->hasMany(FilaEspera::class); }
+    public function cardapios()
+    {
+        return $this->hasMany(Cardapio::class);
+    }
+
+    public function mesas()
+    {
+        return $this->hasMany(Mesa::class);
+    }
+
+    public function promocoes()
+    {
+        return $this->hasMany(Promocao::class);
+    }
+
+    public function fila()
+    {
+        return $this->hasMany(FilaEspera::class);
+    }
+
+    public function getTipoCulinariaAttribute(): ?string
+    {
+        return $this->attributes['categoria'] ?? null;
+    }
+
+    /** Cheio quando já existe mesa e nenhuma está livre. */
+    public function estaCheio(): bool
+    {
+        if (! $this->mesas()->exists()) {
+            return false;
+        }
+
+        return ! $this->mesas()->where('status', 'livre')->exists();
+    }
 
     /** Só o dono (quem cadastrou) gerencia cardápio, mesas, promoções, fila e reservas. */
     public function autorizarDono(User $user): void

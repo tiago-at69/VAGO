@@ -27,10 +27,17 @@
     <nav class="menu" aria-label="Principal">
         <button type="button" data-tela="tela-inicio" data-nav="tela-inicio" class="on">Início</button>
         <button type="button" data-tela="tela-feed" data-nav="tela-feed">Restaurantes</button>
+        <button type="button" data-tela="tela-mesas" data-nav="tela-mesas">Mesas</button>
+        <button type="button" data-tela="tela-promocoes" data-nav="tela-promocoes">Promoções</button>
         <button type="button" data-tela="tela-ranking" data-nav="tela-ranking">Curadoria</button>
+        <button type="button" data-tela="tela-reservas" data-nav="tela-reservas" class="logado" hidden>Reservas</button>
+        <button type="button" data-tela="tela-avaliacoes" data-nav="tela-avaliacoes" class="logado" hidden>Avaliações</button>
+        <button type="button" data-tela="tela-fila" data-nav="tela-fila" class="logado" hidden>Fila</button>
+        <button type="button" data-tela="tela-favoritos" data-nav="tela-favoritos" class="so-cliente" hidden>Favoritos</button>
         <button type="button" data-tela="tela-contato" data-nav="tela-contato">Contato</button>
     </nav>
     <div class="acoes">
+        <span class="tipo-conta logado" id="tipo-conta" hidden></span>
         <button type="button" class="ghost deslogado" data-tela="tela-login">Entrar</button>
         <button type="button" class="icone logado" id="btn-perfil" data-tela="tela-perfil" hidden title="Perfil" aria-label="Perfil">
             <span class="avatar" id="perfil-iniciais" aria-hidden="true"></span>
@@ -160,6 +167,7 @@
         <div class="miolo">
             <p class="olho">Sua mesa</p>
             <h2>Reservas</h2>
+            <p class="lead" id="lead-reservas">As mesas que você pediu.</p>
             <div id="lista-reservas" class="painel lista"></div>
         </div>
     </section>
@@ -188,12 +196,83 @@
         </div>
     </section>
 
+    <section id="tela-promocoes" class="tela">
+        <div class="miolo">
+            <p class="olho">Da casa</p>
+            <h2>Promoções</h2>
+            <p class="lead">Ofertas publicadas pelos restaurantes. Quem tem o salão publica; quem reserva, aproveita.</p>
+            <div id="lista-promocoes"></div>
+        </div>
+    </section>
+
+    <section id="tela-avaliacoes" class="tela">
+        <div class="miolo">
+            <p class="olho">Notas e comentários</p>
+            <h2>Avaliações</h2>
+            <p class="lead" id="lead-avaliacoes">Restaurantes e pratos do cardápio.</p>
+            <div id="lista-avaliacoes"></div>
+        </div>
+    </section>
+
+    <section id="tela-mesas" class="tela">
+        <div class="miolo">
+            <p class="olho">O salão</p>
+            <h2>Mesas</h2>
+            <p class="lead" id="lead-mesas">Cada mesa pertence a um restaurante e tem a sua quantidade de cadeiras.</p>
+            <div id="lista-mesas"></div>
+        </div>
+    </section>
+
+    <section id="tela-fila" class="tela">
+        <div class="miolo">
+            <p class="olho">Quando o salão lotar</p>
+            <h2>Fila de espera</h2>
+            <p class="lead" id="lead-fila">A fila abre só quando não há mesa livre.</p>
+            <div id="lista-fila" class="painel lista"></div>
+        </div>
+    </section>
+
+    <section id="tela-cadastro-cliente" class="tela">
+        <div class="miolo estreito">
+            <button type="button" class="voltar" data-tela="tela-login">← Voltar</button>
+            <p class="olho">Para quem reserva</p>
+            <h2>Criar conta de cliente</h2>
+            <p class="lead">Com essa conta você reserva mesa, avalia o salão e os pratos, e entra na fila quando o restaurante está cheio.</p>
+            <form data-acao="cad-usuario" class="painel">
+                <label>Nome completo* <input id="u-nome" required maxlength="255"></label>
+                <label>E-mail* <input id="u-email" type="email" required></label>
+                <div class="linha">
+                    <label>CPF <input id="u-cpf" inputmode="numeric" maxlength="14" placeholder="000.000.000-00"></label>
+                    <label>Telefone <input id="u-tel" maxlength="30" placeholder="(00) 00000-0000"></label>
+                </div>
+                <label>Senha (mín. 8)* <input id="u-senha" type="password" required minlength="8"></label>
+                <button class="primario">Criar conta de cliente</button>
+            </form>
+        </div>
+    </section>
+
     <section id="tela-cadastro" class="tela">
         <div class="miolo estreito">
+            <button type="button" class="voltar" data-tela="tela-login">← Voltar</button>
             <p class="olho">Para quem cozinha</p>
-            <h2>Cadastrar restaurante</h2>
+            <h2 id="cad-titulo">Cadastrar restaurante</h2>
+            <p class="lead">A conta do restaurante é separada da conta de cliente. Ela publica o salão, as mesas e as promoções.</p>
+            <div id="cad-aviso-cliente" class="aviso" hidden>
+                <strong>Você está numa conta de cliente.</strong>
+                <p>Saia desta conta para criar o cadastro do restaurante. As duas contas não se misturam.</p>
+                <button type="button" data-acao="sair">Sair e cadastrar restaurante</button>
+            </div>
             <form data-acao="cad-restaurante" class="painel">
-                <label>Nome* <input id="cad-nome" required maxlength="255"></label>
+                <div id="cad-conta">
+                    <h3 style="margin-top:0">Sua conta</h3>
+                    <label>Seu nome* <input id="cad-responsavel" required maxlength="255"></label>
+                    <div class="linha">
+                        <label>E-mail* <input id="cad-email" type="email" required></label>
+                        <label>Senha (mín. 8)* <input id="cad-senha" type="password" required minlength="8"></label>
+                    </div>
+                </div>
+                <h3>O restaurante</h3>
+                <label>Nome do restaurante* <input id="cad-nome" required maxlength="255"></label>
                 <div class="linha">
                     <label>Tipo de culinária* <select id="cad-categoria" required>
                         <option>Italiana</option>
@@ -206,11 +285,11 @@
                         <option>Doces &amp; Sobremesas</option>
                         <option>Geral</option>
                     </select></label>
-                    <label>Telefone <input id="cad-telefone" maxlength="30" placeholder="(00) 00000-0000"></label>
+                    <label>Telefone do salão <input id="cad-telefone" maxlength="30" placeholder="(00) 00000-0000"></label>
                 </div>
                 <label>Endereço* <input id="cad-endereco" required maxlength="255"></label>
                 <div class="linha">
-                    <label>Capacidade (mesas) <input id="cad-capacidade" type="number" min="0" value="0"></label>
+                    <label>Capacidade de mesas (0 = sem limite) <input id="cad-capacidade" type="number" min="0" value="0"></label>
                     <label>Tolerância de atraso <input id="cad-tolerancia" type="time" value="00:15"></label>
                 </div>
                 <label>Descrição <textarea id="cad-descricao" rows="3" maxlength="2000"></textarea></label>
@@ -220,31 +299,23 @@
     </section>
 
     <section id="tela-login" class="tela">
-        <div class="miolo">
+        <div class="miolo estreito">
             <p class="olho">Sua conta</p>
             <h2>Entrar no VAGO</h2>
-            <div class="duas">
-                <div class="painel">
-                    <h3>Entrar</h3>
-                    <form data-acao="login">
-                        <label>E-mail <input id="login-email" type="email" required></label>
-                        <label>Senha <input id="login-senha" type="password" required></label>
-                        <button class="primario">Entrar</button>
-                    </form>
-                </div>
-                <div class="painel">
-                    <h3>Criar conta</h3>
-                    <form data-acao="cad-usuario">
-                        <label>Nome completo <input id="u-nome" required maxlength="255"></label>
-                        <label>E-mail <input id="u-email" type="email" required></label>
-                        <div class="linha">
-                            <label>CPF (11 dígitos) <input id="u-cpf" inputmode="numeric" pattern="\d{11}" maxlength="11"></label>
-                            <label>Telefone <input id="u-tel" maxlength="30"></label>
-                        </div>
-                        <label>Senha (mín. 8) <input id="u-senha" type="password" required minlength="8"></label>
-                        <button class="primario">Cadastrar</button>
-                    </form>
-                </div>
+            <form data-acao="login" class="painel">
+                <label>E-mail <input id="login-email" type="email" required></label>
+                <label>Senha <input id="login-senha" type="password" required></label>
+                <button class="primario">Entrar</button>
+            </form>
+            <div class="escolha">
+                <button type="button" data-tela="tela-cadastro-cliente">
+                    <strong>Sou cliente</strong>
+                    <span>Criar conta para reservar, avaliar e entrar na fila.</span>
+                </button>
+                <button type="button" data-tela="tela-cadastro">
+                    <strong>Tenho um restaurante</strong>
+                    <span>Criar a conta do salão, com mesas, promoções e reservas.</span>
+                </button>
             </div>
         </div>
     </section>

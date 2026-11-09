@@ -16,6 +16,10 @@ const cpfBR = (c) => {
 };
 const hoje = () => new Date().toISOString().slice(0, 10);
 const val = (id) => $(id).value.trim();
+const ehRestaurante = () => E.user?.tipo === 'restaurante';
+const ehCliente = () => !!E.token && !ehRestaurante();
+const horaCurta = (id) => { const v = $(id).value.trim(); return v ? v.slice(0, 5) : ''; };
+const telaAtiva = (id) => $(id)?.classList.contains('ativa');
 
 let toastTimer;
 function toast(msg, erro = false) {
@@ -57,15 +61,17 @@ function aplicarTema(tema) {
 }
 
 // ---------- Navegação ----------
-const PROTEGIDAS = new Set(['tela-favoritos', 'tela-reservas', 'tela-perfil', 'tela-cadastro']);
+const PROTEGIDAS = new Set(['tela-favoritos', 'tela-reservas', 'tela-perfil', 'tela-avaliacoes', 'tela-fila']);
 function navegarPara(id) {
     if (PROTEGIDAS.has(id) && !E.token) id = 'tela-login';
     document.querySelectorAll('.tela').forEach((t) => t.classList.toggle('ativa', t.id === id));
     const nav = { 'tela-detalhe': 'tela-feed' }[id] || id;
     document.querySelectorAll('[data-nav]').forEach((b) => b.classList.toggle('on', b.dataset.nav === nav));
     ({ 'tela-feed': () => carregarRestaurantes(), 'tela-ranking': carregarRanking,
-       'tela-favoritos': carregarFavoritos, 'tela-reservas': carregarMinhasReservas,
-       'tela-perfil': carregarPerfil })[id]?.();
+       'tela-favoritos': carregarFavoritos, 'tela-reservas': carregarReservas,
+       'tela-perfil': carregarPerfil, 'tela-promocoes': carregarPromocoes,
+       'tela-avaliacoes': carregarAvaliacoes, 'tela-mesas': carregarMesas,
+       'tela-fila': carregarFila, 'tela-cadastro': prepararCadastroRestaurante })[id]?.();
     window.scrollTo(0, 0);
 }
 
@@ -82,8 +88,11 @@ function iniciaisDe(nome) {
 function atualizarConta() {
     document.querySelectorAll('.logado').forEach((e) => (e.hidden = !E.token));
     document.querySelectorAll('.deslogado').forEach((e) => (e.hidden = !!E.token));
+    document.querySelectorAll('.so-cliente').forEach((e) => (e.hidden = !ehCliente()));
     const b = $('btn-perfil');
     const nome = E.user?.name || '';
+    const tipo = $('tipo-conta');
+    if (tipo) tipo.textContent = !E.token ? '' : (ehRestaurante() ? 'Restaurante' : 'Cliente');
     if (b) {
         b.title = nome ? `Perfil de ${nome}` : 'Perfil';
         b.setAttribute('aria-label', b.title);
@@ -107,7 +116,7 @@ function card(r, pos) {
     const nota = notaTxt(r.avaliacoes_avg_nota, r.avaliacoes_count);
     return `<article class="card">
         <div class="card-foto" style="background-image:url('${fotoDe(r)}')">
-            ${E.token ? `<button class="fav ${E.favs.has(r.id) ? 'on' : ''}" data-fav="${r.id}" title="Favoritar">♥</button>` : ''}
+            ${ehCliente() ? `<button class="fav ${E.favs.has(r.id) ? 'on' : ''}" data-fav="${r.id}" title="Favoritar">♥</button>` : ''}
             <span class="selo">${esc(r.categoria || 'Geral')}</span>
         </div>
         <h3>${pos ? pos + 'º ' : ''}${esc(r.nome)}</h3>
@@ -260,7 +269,8 @@ async function carregarCategorias() {
 // ---------- Detalhe do restaurante ----------
 const ehDono = () => E.user && E.r && E.r.user_id === E.user.id;
 
-async function abrirRestaurante(id) {
+async function abrirRestaurante(id, aba) {
+    if (aba) E.aba = aba;
     navegarPara('tela-detalhe');
     await tentar(async () => {
         E.r = await api(`/restaurantes/${id}`);
@@ -278,7 +288,7 @@ async function abrirRestaurante(id) {
             </div>
             ${r.descricao ? `<p>${esc(r.descricao)}</p>` : ''}
             ${htmlPicos(r.picos)}
-            ${E.token ? `<button data-fav="${r.id}" class="fav-topo">${E.favs.has(r.id) ? '♥ Favorito' : '♡ Favoritar'}</button>` : ''}`;
+            ${ehCliente() ? `<button data-fav="${r.id}" class="fav-topo">${E.favs.has(r.id) ? '♥ Favorito' : '♡ Favoritar'}</button>` : ''}`;
         await mostrarAba(E.aba);
     });
 }
@@ -311,7 +321,7 @@ const cardPrato = (p, dono) => `<div class="card">
     <div class="preco">${brl(p.preco)}</div>
     <div class="nota">${notaTxt(p.avaliacoes_avg_nota, p.avaliacoes_count)}</div>
     ${htmlAvaliacoesPrato(p, dono)}
-    ${E.token ? (p.minha_nota
+    ${ehCliente() && !dono ? (p.minha_nota
         ? `<p class="mut">Você avaliou ★${p.minha_nota}</p>`
         : `<form data-acao="avaliar-prato" data-id="${p.id}">
             <div class="linha"><label>Nota <select id="ap-${p.id}">${[5, 4, 3, 2, 1].map((n) => `<option>${n}</option>`).join('')}</select></label>
@@ -338,6 +348,8 @@ const ABAS = {
         const blocos = PRATO_CATS.filter((c) => grupos[c]).map((c, i) =>
             `<h3 style="margin-top:${i ? '1.2rem' : '0'}">${esc(c)}</h3><div class="grid">${grupos[c].map((p) => cardPrato(p, dono)).join('')}</div>`).join('');
         return (itens.length ? blocos : vazio('O cardápio ainda está vazio.'))
+            + (!E.token && itens.length ? vazio('Entre com uma conta de cliente para avaliar os pratos.') : '')
+            + (ehRestaurante() && !dono && itens.length ? vazio('Para avaliar os pratos, use uma conta de cliente.') : '')
             + (dono ? formDono('add-prato', 'novo prato', `
                 <div class="linha">
                     <label>Nome <input id="p-nome" required maxlength="255"></label>
@@ -351,23 +363,35 @@ const ABAS = {
     async reservar(id, dono) {
         const mesas = await api(`/restaurantes/${id}/mesas`);
         const proximo = mesas.reduce((n, m) => Math.max(n, m.numero), 0) + 1;
-        let html = `<h3 style="margin-top:0">Mapa do salão</h3>${htmlMapa(mesas, dono)}`;
+        const cap = Number(E.r?.capacidade_mesas) || 0;
+        const lotado = cap > 0 && mesas.length >= cap;
+        let html = `<h3 style="margin-top:0">Mapa do salão</h3>`;
+        if (dono) html += `<p class="mut">${cap > 0 ? `${mesas.length} de ${cap} mesas da capacidade.` : `${mesas.length} mesas no salão.`}${E.r?.cheio ? ' Salão cheio — a fila está aberta.' : ''}</p>`;
+        html += htmlMapa(mesas, dono);
         html += mesas.length ? `<div class="lista">${mesas.map((m) => `<div>
                 <span><strong>Mesa ${m.numero}</strong> · ${m.cadeiras} cadeiras</span>
                 <span><span class="mesa ${m.status}">${m.status}</span>
-                ${dono ? ['livre', 'ocupada', 'reservada'].filter((s) => s !== m.status).map((s) => `<button class="mini" data-acao="mesa-status" data-id="${m.id}" data-v="${s}">${s}</button>`).join(' ') : ''}</span>
+                ${dono ? ['livre', 'ocupada', 'reservada'].filter((s) => s !== m.status).map((s) => `<button class="mini" data-acao="mesa-status" data-id="${m.id}" data-v="${s}">${s}</button>`).join(' ') : ''}
+                ${dono ? `<form class="em-linha" data-acao="mesa-cadeiras" data-id="${m.id}"><input type="number" min="1" max="50" value="${m.cadeiras}" aria-label="Cadeiras da mesa ${m.numero}"><button class="mini">Cadeiras</button></form>` : ''}</span>
             </div>`).join('')}</div>` : vazio('Nenhuma mesa no mapa ainda.');
 
-        html += E.token && mesas.length ? `<h3>Reservar</h3><form data-acao="reservar">
+        if (ehCliente() && mesas.length) {
+            html += `<h3>Reservar</h3><form data-acao="reservar">
             <label>Mesa <select id="r-mesa">${mesas.map((m) => `<option value="${m.id}"${E.mesaSel == m.id ? ' selected' : ''}>Mesa ${m.numero} (${m.cadeiras} lugares)</option>`).join('')}</select></label>
             <div class="linha"><label>Data <input id="r-data" type="date" min="${hoje()}" required></label>
             <label>Horário <input id="r-hora" type="time" required></label>
             <label>Pessoas <input id="r-pessoas" type="number" min="1" value="2" required></label></div>
-            <button class="primario">Solicitar reserva</button></form>`
-            : (!E.token ? vazio('Entre na sua conta para reservar uma mesa.') : '');
+            <button class="primario">Solicitar reserva</button></form>`;
+        } else if (!E.token) {
+            html += vazio('Entre com uma conta de cliente para reservar uma mesa.');
+        } else if (ehRestaurante() && !dono) {
+            html += vazio('Para reservar uma mesa, use uma conta de cliente.');
+        }
 
         if (dono) {
-            html += formDono('add-mesa', 'nova mesa', `<div class="linha"><label>Número <input id="m-num" type="number" min="1" value="${proximo}" required></label><label>Cadeiras <input id="m-cad" type="number" min="1" value="4" required></label></div>
+            html += lotado
+                ? vazio('A capacidade de mesas deste restaurante já foi atingida.')
+                : formDono('add-mesa', 'nova mesa', `<div class="linha"><label>Número <input id="m-num" type="number" min="1" value="${proximo}" required></label><label>Cadeiras <input id="m-cad" type="number" min="1" value="4" required></label></div>
                 <input type="hidden" id="m-x"><input type="hidden" id="m-y">
                 <p class="mut" id="m-pos">Clique num espaço vazio do mapa para escolher o lugar — ou deixe o sistema posicionar.</p>`);
             const rs = await api(`/restaurantes/${id}/reservas`);
@@ -391,13 +415,23 @@ const ABAS = {
     },
 
     async fila(id, dono) {
-        const f = await api(`/restaurantes/${id}/fila`);
+        const [f, info] = await Promise.all([api(`/restaurantes/${id}/fila`), api(`/restaurantes/${id}`)]);
+        E.r = info;
         const naFila = E.user && f.some((x) => x.user_id === E.user.id);
-        return `<div class="lista">${f.map((x) => `<div><span><span class="pos">${x.posicao}</span> &nbsp;${esc(x.user.name)}</span>
-                <span class="mut">entrou às ${String(x.hora_entrada).slice(0, 5)}</span></div>`).join('') || vazio('Ninguém na fila agora.')}</div>
-            <div class="linha" style="margin-top:1rem">
-            ${E.token ? (naFila ? '<button data-acao="fila-sair">Sair da fila</button>' : '<button class="primario" data-acao="fila-entrar">Entrar na fila</button>') : vazio('Entre na sua conta para entrar na fila.')}
-            ${dono && f.length ? '<button class="primario" data-acao="fila-chamar">Chamar próximo</button>' : ''}</div>`;
+        const lista = `<div class="lista">${f.map((x) => `<div><span><span class="pos">${x.posicao}</span> &nbsp;${esc(x.user.name)}</span>
+                <span class="mut">entrou às ${String(x.hora_entrada).slice(0, 5)}</span></div>`).join('') || vazio('Ninguém na fila agora.')}</div>`;
+        if (dono) {
+            return lista + `<div class="linha" style="margin-top:1rem">${f.length ? '<button class="primario" data-acao="fila-chamar">Chamar próximo</button>' : ''}</div>
+                <p class="mut">${info.cheio ? 'O salão está cheio. Os clientes podem entrar na fila.' : 'Enquanto houver mesa livre, a fila fica fechada e o cliente reserva.'}</p>`;
+        }
+        if (!E.token) return lista + vazio('Entre com uma conta de cliente. A fila abre quando o salão estiver cheio.');
+        if (!ehCliente()) return lista + vazio('A fila é para contas de cliente.');
+        if (naFila) return lista + '<div class="linha" style="margin-top:1rem"><button data-acao="fila-sair">Sair da fila</button></div>';
+        if (!info.cheio) {
+            const texto = info.mesas_count ? 'Ainda há mesa livre. Reserve em vez de entrar na fila.' : 'O restaurante ainda não publicou mesas. A fila abre quando o salão estiver cheio.';
+            return lista + `<p class="mut">${texto}</p><button type="button" data-aba="reservar">Ver mesas</button>`;
+        }
+        return lista + '<div class="linha" style="margin-top:1rem"><button class="primario" data-acao="fila-entrar">Entrar na fila</button></div>';
     },
 
     async avaliacoes(id, dono) {
@@ -408,34 +442,22 @@ const ABAS = {
                 ${dono ? `<form data-acao="responder" data-id="${x.id}">
                     <label>${x.resposta ? 'Atualizar resposta' : 'Responder'} <textarea id="rp-${x.id}" rows="2" required maxlength="2000">${esc(x.resposta || '')}</textarea></label>
                     <button class="primario">${x.resposta ? 'Atualizar resposta' : 'Publicar resposta'}</button></form>` : ''}</div>`).join('') || vazio('Ainda não há avaliações.')}</div>`
-            + (E.token ? `<h3>Avaliar</h3><form data-acao="avaliar">
+            + (ehCliente() && !dono ? `<h3>Avaliar o restaurante</h3><form data-acao="avaliar">
                 <label>Nota <select id="av-nota">${[5, 4, 3, 2, 1].map((n) => `<option>${n}</option>`).join('')}</select></label>
-                <label>Comentário <textarea id="av-com" rows="3"></textarea></label><button class="primario">Enviar avaliação</button></form>` : vazio('Entre na sua conta para avaliar.'));
+                <label>Comentário <textarea id="av-com" rows="3"></textarea></label><button class="primario">Enviar avaliação</button></form>`
+                : (!E.token ? vazio('Entre com uma conta de cliente para avaliar.') : (ehRestaurante() && !dono ? vazio('Para avaliar, use uma conta de cliente.') : '')));
     },
 };
 
 // ---------- Perfil ----------
 function guardarUsuario(p) {
-    E.user = { id: p.id, name: p.name, email: p.email, cpf: p.cpf, telefone: p.telefone };
+    E.user = { id: p.id, name: p.name, email: p.email, cpf: p.cpf, telefone: p.telefone, tipo: p.tipo || 'cliente' };
     localStorage.setItem('vago_user', JSON.stringify(E.user));
     atualizarConta();
 }
-function htmlPerfil(p) {
-    const c = p.contagens || {};
-    const restaurantes = p.restaurantes?.length
-        ? `<div class="lista">${p.restaurantes.map((r) => `<div>
-            <span><strong>${esc(r.nome)}</strong> · ${esc(r.categoria || 'Geral')}</span>
-            <button class="mini primario" data-abrir="${r.id}">Ver</button></div>`).join('')}</div>`
-        : vazio('Você ainda não cadastrou um restaurante.') + '<button class="primario" data-tela="tela-cadastro">Cadastrar restaurante</button>';
-    const avaliacoes = p.avaliacoes?.length
-        ? `<div class="lista">${p.avaliacoes.map((a) => `<div style="display:block">
-            <strong class="nota">${'★'.repeat(a.nota)}${'☆'.repeat(5 - a.nota)}</strong>
-            <span class="mut"> em </span><button class="mini" data-abrir="${a.restaurante?.id}">${esc(a.restaurante?.nome || 'Restaurante')}</button>
-            ${a.comentario ? `<p>${esc(a.comentario)}</p>` : ''}${htmlResposta(a)}</div>`).join('')}</div>`
-        : vazio('Você ainda não avaliou nenhum restaurante.');
-    return `
-        <div class="painel hero" style="margin-top:1rem">
-            <span class="selo">Conta</span>
+function htmlCabecaPerfil(p, selo) {
+    return `<div class="painel hero" style="margin-top:1rem">
+            <span class="selo">${selo}</span>
             <h3 style="margin:.3rem 0 0">${esc(p.name)}</h3>
             <div class="info">
                 <span>${esc(p.email)}</span>
@@ -443,27 +465,75 @@ function htmlPerfil(p) {
                 <span>No VAGO desde ${dataBR(p.created_at)}</span>
             </div>
             <button type="button" data-acao="sair">Sair da conta</button>
-        </div>
-        <div class="numeros">
-            <button type="button" data-tela="tela-favoritos"><strong>${c.favoritos ?? 0}</strong><span>Favoritos</span></button>
-            <button type="button" data-tela="tela-reservas"><strong>${c.reservas ?? 0}</strong><span>Reservas</span></button>
-            <button type="button"><strong>${c.avaliacoes ?? 0}</strong><span>Avaliações</span></button>
-            <button type="button"${c.restaurantes ? '' : ' data-tela="tela-cadastro"'}><strong>${c.restaurantes ?? 0}</strong><span>Restaurantes</span></button>
-        </div>
-        <div class="duas">
-            <form data-acao="salvar-perfil" class="painel">
+        </div>`;
+}
+function htmlFormDados(p) {
+    return `<form data-acao="salvar-perfil" class="painel">
                 <h3 style="margin-top:0">Seus dados</h3>
                 <label>Nome completo <input id="pf-nome" required maxlength="255" value="${esc(p.name)}"></label>
                 <label>E-mail <input id="pf-email" type="email" value="${esc(p.email)}" readonly></label>
                 <label>CPF <input id="pf-cpf" value="${esc(cpfBR(p.cpf))}" readonly></label>
                 <label>Telefone <input id="pf-tel" maxlength="30" value="${esc(p.telefone || '')}" placeholder="(00) 00000-0000"></label>
                 <button class="primario">Salvar alterações</button>
-            </form>
+            </form>`;
+}
+function htmlPerfil(p) {
+    return p.tipo === 'restaurante' ? htmlPerfilRestaurante(p) : htmlPerfilCliente(p);
+}
+function htmlPerfilCliente(p) {
+    const c = p.contagens || {};
+    const avaliacoes = p.avaliacoes?.length
+        ? `<div class="lista">${p.avaliacoes.map((a) => `<div style="display:block">
+            <strong class="nota">${'★'.repeat(a.nota)}${'☆'.repeat(5 - a.nota)}</strong>
+            <span class="mut"> em </span><button class="mini" data-abrir="${a.restaurante?.id}" data-aba="avaliacoes">${esc(a.restaurante?.nome || 'Restaurante')}</button>
+            ${a.comentario ? `<p>${esc(a.comentario)}</p>` : ''}${htmlResposta(a)}</div>`).join('')}</div>`
+        : vazio('Você ainda não avaliou nenhum restaurante.');
+    const pratos = p.avaliacoes_pratos?.length
+        ? `<div class="lista">${p.avaliacoes_pratos.map((a) => `<div style="display:block">
+            <strong class="nota">${'★'.repeat(a.nota)}${'☆'.repeat(5 - a.nota)}</strong>
+            <span class="mut">${esc(a.prato?.nome || 'Prato')} · ${esc(a.prato?.restaurante?.nome || '')}</span>
+            ${a.comentario ? `<p>${esc(a.comentario)}</p>` : ''}</div>`).join('')}</div>`
+        : vazio('Você ainda não avaliou um prato.');
+    return `
+        ${htmlCabecaPerfil(p, 'Cliente')}
+        <div class="numeros">
+            <button type="button" data-tela="tela-favoritos"><strong>${c.favoritos ?? 0}</strong><span>Favoritos</span></button>
+            <button type="button" data-tela="tela-reservas"><strong>${c.reservas ?? 0}</strong><span>Reservas</span></button>
+            <button type="button" data-tela="tela-avaliacoes"><strong>${c.avaliacoes ?? 0}</strong><span>Avaliações</span></button>
+            <button type="button" data-tela="tela-fila"><strong>Fila</strong><span>Quando lotar</span></button>
+        </div>
+        <div class="duas">
+            ${htmlFormDados(p)}
+            <div class="painel">
+                <h3 style="margin-top:0">Avaliações de restaurantes</h3>
+                ${avaliacoes}
+                <h3>Avaliações de pratos</h3>
+                ${pratos}
+            </div>
+        </div>`;
+}
+function htmlPerfilRestaurante(p) {
+    const c = p.contagens || {};
+    const restaurantes = p.restaurantes?.length
+        ? `<div class="lista">${p.restaurantes.map((r) => `<div>
+            <span><strong>${esc(r.nome)}</strong> · ${esc(r.categoria || 'Geral')}</span>
+            <span><button class="mini" data-abrir="${r.id}">Ver</button>
+            <button class="mini primario" data-acao="abrir-salao" data-id="${r.id}">Mesas</button></span></div>`).join('')}</div>`
+        : vazio('Você ainda não cadastrou um restaurante.');
+    return `
+        ${htmlCabecaPerfil(p, 'Restaurante')}
+        <div class="numeros">
+            <button type="button" data-tela="tela-mesas"><strong>${c.restaurantes ?? 0}</strong><span>Restaurantes</span></button>
+            <button type="button" data-tela="tela-reservas"><strong>Reservas</strong><span>Recebidas</span></button>
+            <button type="button" data-tela="tela-avaliacoes"><strong>Avaliações</strong><span>Do salão e dos pratos</span></button>
+            <button type="button" data-tela="tela-fila"><strong>Fila</strong><span>Chamar próximo</span></button>
+        </div>
+        <div class="duas">
+            ${htmlFormDados(p)}
             <div class="painel">
                 <h3 style="margin-top:0">Seus restaurantes</h3>
                 ${restaurantes}
-                <h3>Suas avaliações</h3>
-                ${avaliacoes}
+                <button class="primario" data-tela="tela-cadastro" style="margin-top:1rem">Cadastrar outro restaurante</button>
             </div>
         </div>`;
 }
@@ -478,16 +548,219 @@ async function carregarPerfil() {
     });
 }
 
-// ---------- Minhas reservas ----------
-async function carregarMinhasReservas() {
+// ---------- Páginas dos dois contextos ----------
+function prepararCadastroRestaurante() {
+    const conta = $('cad-conta');
+    const aviso = $('cad-aviso-cliente');
+    const form = document.querySelector('#tela-cadastro form');
+    const cliente = E.user?.tipo === 'cliente';
+    const donoLogado = ehRestaurante();
+    if (conta) conta.hidden = donoLogado;
+    if (aviso) aviso.hidden = !cliente;
+    if (form) form.hidden = cliente;
+    conta?.querySelectorAll('input').forEach((el) => { el.required = !donoLogado && !cliente; });
+    const titulo = $('cad-titulo');
+    if (titulo) titulo.textContent = donoLogado ? 'Novo restaurante' : 'Cadastrar restaurante';
+}
+
+async function carregarReservas() {
+    const lead = $('lead-reservas');
+    if (ehRestaurante()) {
+        if (lead) lead.textContent = 'Pedidos que chegaram para o seu salão. Confirme ou recuse.';
+        await tentar(async () => {
+            const l = await api('/reservas-recebidas');
+            $('lista-reservas').innerHTML = l.map((r) => `<div>
+                <span><strong>${esc(r.user?.name || 'Cliente')}</strong>${r.user?.telefone ? ` · ${esc(r.user.telefone)}` : ''} · ${esc(r.mesa?.restaurante?.nome || '')} · Mesa ${r.mesa?.numero} (${r.mesa?.cadeiras || '?'} cadeiras) · ${dataBR(r.data)} ${String(r.horario).slice(0, 5)} · ${r.num_pessoas} pessoa(s)</span>
+                <span><span class="mesa ${r.status_confirmacao}">${r.status_confirmacao}</span>
+                ${r.status_confirmacao === 'pendente' ? `<button class="mini" data-acao="res-status" data-id="${r.id}" data-v="confirmada" data-origem="pagina">Confirmar</button>
+                <button class="mini" data-acao="res-status" data-id="${r.id}" data-v="recusada" data-origem="pagina">Recusar</button>` : ''}</span></div>`).join('')
+                || vazio('Nenhuma reserva recebida ainda.');
+        });
+        return;
+    }
+    if (lead) lead.textContent = 'As mesas que você pediu. O restaurante confirma ou recusa.';
     await tentar(async () => {
         const l = await api('/minhas-reservas');
         $('lista-reservas').innerHTML = l.map((r) => `<div>
             <span><strong>${esc(r.mesa.restaurante.nome)}</strong> · Mesa ${r.mesa.numero} · ${dataBR(r.data)} ${String(r.horario).slice(0, 5)} · ${r.num_pessoas} pessoa(s)</span>
             <span><span class="mesa ${r.status_confirmacao}">${r.status_confirmacao}</span>
-            ${['pendente', 'confirmada'].includes(r.status_confirmacao) ? `<button class="mini" data-acao="res-status" data-id="${r.id}" data-v="cancelada" data-minhas="1">Cancelar</button>` : ''}</span></div>`).join('')
+            ${['pendente', 'confirmada'].includes(r.status_confirmacao) ? `<button class="mini" data-acao="res-status" data-id="${r.id}" data-v="cancelada" data-origem="pagina">Cancelar</button>` : ''}
+            <button class="mini" data-abrir="${r.mesa.restaurante.id}">Ver salão</button></span></div>`).join('')
             || vazio('Você ainda não fez nenhuma reserva.');
     });
+}
+
+async function carregarPromocoes() {
+    const c = $('lista-promocoes');
+    c.innerHTML = vazio('Carregando...');
+    await tentar(async () => {
+        const ps = await api('/promocoes');
+        let html = ps.length ? `<div class="grid">${ps.map((p) => `<article class="card">
+            ${p.banner_url ? `<img class="banner" src="${esc(p.banner_url)}" alt="" onerror="this.remove()">` : ''}
+            <h3>${esc(p.titulo)}</h3>
+            <p>${esc(p.restaurante?.nome || '')}${p.restaurante?.categoria ? ` · ${esc(p.restaurante.categoria)}` : ''}</p>
+            <button class="primario" data-abrir="${p.restaurante_id}" data-aba="promocoes">Ver no restaurante</button>
+        </article>`).join('')}</div>` : vazio('Nenhuma promoção publicada ainda.');
+        if (ehRestaurante()) {
+            const perfil = await api('/perfil');
+            const meus = perfil.restaurantes || [];
+            html += meus.length
+                ? `<div class="dono"><strong>Área do restaurante · publicar promoção</strong>
+                    <form data-acao="add-promo-pagina">
+                        ${meus.length > 1 ? `<label>Restaurante <select id="pg-pr-rest">${meus.map((r) => `<option value="${r.id}">${esc(r.nome)}</option>`).join('')}</select></label>` : `<input type="hidden" id="pg-pr-rest" value="${meus[0].id}">`}
+                        <label>Título <input id="pg-pr-titulo" required maxlength="255"></label>
+                        <label>URL do banner <input id="pg-pr-banner" type="url" placeholder="https://..."></label>
+                        <button class="primario">Publicar promoção</button>
+                    </form></div>`
+                : vazio('Publique o restaurante para anunciar uma promoção.') + '<button class="primario" data-tela="tela-cadastro">Cadastrar restaurante</button>';
+        }
+        c.innerHTML = html;
+    });
+}
+
+function htmlAvaliacoesFeitas(dados) {
+    const restaurantes = (dados.restaurantes || []).map((a) => `<div style="display:block">
+        <strong class="nota">${'★'.repeat(a.nota)}${'☆'.repeat(5 - a.nota)}</strong>
+        <button class="mini" data-abrir="${a.restaurante?.id}" data-aba="avaliacoes">${esc(a.restaurante?.nome || 'Restaurante')}</button>
+        ${a.comentario ? `<p>${esc(a.comentario)}</p>` : ''}${htmlResposta(a)}</div>`).join('');
+    const pratos = (dados.pratos || []).map((a) => `<div style="display:block">
+        <strong class="nota">${'★'.repeat(a.nota)}${'☆'.repeat(5 - a.nota)}</strong>
+        <span class="mut">${esc(a.prato?.nome || 'Prato')} · ${esc(a.prato?.restaurante?.nome || '')}</span>
+        ${a.comentario ? `<p>${esc(a.comentario)}</p>` : ''}${htmlResposta(a)}
+        <button class="mini" data-abrir="${a.prato?.restaurante?.id || a.prato?.restaurante_id}" data-aba="cardapio">Ver cardápio</button></div>`).join('');
+    return `<div class="duas">
+        <div class="painel"><h3 style="margin-top:0">Restaurantes</h3><div class="lista">${restaurantes || vazio('Você ainda não avaliou um restaurante.')}</div></div>
+        <div class="painel"><h3 style="margin-top:0">Pratos do cardápio</h3><div class="lista">${pratos || vazio('Você ainda não avaliou um prato.')}</div></div>
+    </div>`;
+}
+function htmlAvaliacoesRecebidas(dados) {
+    const bloco = (itens, prato) => itens.map((a) => `<div style="display:block">
+        <strong class="nota">${'★'.repeat(a.nota)}${'☆'.repeat(5 - a.nota)}</strong>
+        <span class="mut">${prato ? esc(a.prato?.nome || 'Prato') + ' · ' : ''}${esc(a.restaurante?.nome || a.prato?.restaurante?.nome || '')} · por ${esc(a.user?.name || 'Cliente')}</span>
+        ${a.comentario ? `<p>${esc(a.comentario)}</p>` : ''}${htmlResposta(a)}
+        <form data-acao="${prato ? 'responder-prato-pagina' : 'responder-pagina'}" data-id="${a.id}">
+            <label>${a.resposta ? 'Atualizar resposta' : 'Responder'} <textarea rows="2" required maxlength="2000">${esc(a.resposta || '')}</textarea></label>
+            <button class="primario">${a.resposta ? 'Atualizar resposta' : 'Publicar resposta'}</button>
+        </form></div>`).join('');
+    return `<div class="duas">
+        <div class="painel"><h3 style="margin-top:0">Do restaurante</h3><div class="lista">${bloco(dados.restaurantes || [], false) || vazio('Ainda não há avaliações do salão.')}</div></div>
+        <div class="painel"><h3 style="margin-top:0">Dos pratos</h3><div class="lista">${bloco(dados.pratos || [], true) || vazio('Ainda não há avaliações de pratos.')}</div></div>
+    </div>`;
+}
+async function carregarAvaliacoes() {
+    const c = $('lista-avaliacoes');
+    const lead = $('lead-avaliacoes');
+    c.innerHTML = vazio('Carregando...');
+    await tentar(async () => {
+        const dados = await api('/minhas-avaliacoes');
+        if (dados.contexto === 'restaurante') {
+            if (lead) lead.textContent = 'O que os clientes escreveram sobre o salão e sobre os pratos. Você pode responder.';
+            c.innerHTML = htmlAvaliacoesRecebidas(dados);
+            return;
+        }
+        if (lead) lead.textContent = 'Suas notas para os restaurantes e para os pratos do cardápio.';
+        c.innerHTML = htmlAvaliacoesFeitas(dados);
+    });
+}
+
+async function carregarMesas() {
+    if (ehRestaurante()) return carregarMesasDono();
+    const lead = $('lead-mesas');
+    if (lead) lead.textContent = 'Escolha um restaurante e veja quantas cadeiras cada mesa tem antes de reservar.';
+    const c = $('lista-mesas');
+    c.innerHTML = vazio('Carregando...');
+    await tentar(async () => {
+        const r = await api('/restaurantes');
+        c.innerHTML = r.data.length ? `<div class="grid">${r.data.map((x) => {
+            const livres = x.mesas_livres_count ?? 0;
+            const total = x.mesas_count ?? 0;
+            const estado = total === 0 ? 'Mesas ainda não publicadas' : (livres === 0 ? 'Salão cheio — fila aberta' : `${livres} de ${total} mesas livres`);
+            return `<article class="card">
+                <span class="selo">${esc(x.categoria || 'Geral')}</span>
+                <h3>${esc(x.nome)}</h3>
+                <p>${esc(x.endereco)}</p>
+                <p>Capacidade prevista: ${x.capacidade_mesas ?? 0} mesas</p>
+                <p>${estado}</p>
+                <button class="primario" data-abrir="${x.id}" data-aba="reservar">Ver mesas</button>
+            </article>`;
+        }).join('')}</div>` : vazio('Nenhum restaurante por aqui.');
+    });
+}
+async function carregarMesasDono() {
+    const lead = $('lead-mesas');
+    if (lead) lead.textContent = 'Cadastre cada mesa com o número e a quantidade de cadeiras. O limite é a capacidade do restaurante.';
+    const c = $('lista-mesas');
+    c.innerHTML = vazio('Carregando...');
+    await tentar(async () => {
+        const perfil = await api('/perfil');
+        const meus = perfil.restaurantes || [];
+        if (!meus.length) {
+            c.innerHTML = vazio('Publique o restaurante para montar o salão.') + '<button class="primario" data-tela="tela-cadastro">Cadastrar restaurante</button>';
+            return;
+        }
+        if (!E.salaoId || !meus.some((r) => r.id == E.salaoId)) E.salaoId = meus[0].id;
+        const info = await api(`/restaurantes/${E.salaoId}`);
+        E.r = info;
+        const mesas = await api(`/restaurantes/${E.salaoId}/mesas`);
+        const proximo = mesas.reduce((n, m) => Math.max(n, m.numero), 0) + 1;
+        const cap = Number(info.capacidade_mesas) || 0;
+        const lotado = cap > 0 && mesas.length >= cap;
+        let html = meus.length > 1 ? `<label>Restaurante <select id="pg-salao">${meus.map((r) => `<option value="${r.id}"${r.id == E.salaoId ? ' selected' : ''}>${esc(r.nome)}</option>`).join('')}</select></label>` : `<p><strong>${esc(info.nome)}</strong></p>`;
+        html += `<p class="mut">${cap > 0 ? `${mesas.length} de ${cap} mesas cadastradas.` : `${mesas.length} mesas cadastradas. A capacidade 0 não limita o salão.`}</p>`;
+        html += htmlMapa(mesas, true);
+        html += mesas.length ? `<div class="lista">${mesas.map((m) => `<div>
+            <span><strong>Mesa ${m.numero}</strong> · ${m.cadeiras} cadeiras</span>
+            <span><span class="mesa ${m.status}">${m.status}</span>
+            ${['livre', 'ocupada', 'reservada'].filter((s) => s !== m.status).map((s) => `<button class="mini" data-acao="mesa-status" data-id="${m.id}" data-v="${s}">${s}</button>`).join(' ')}
+            <form class="em-linha" data-acao="mesa-cadeiras" data-id="${m.id}"><input type="number" min="1" max="50" value="${m.cadeiras}" aria-label="Cadeiras da mesa ${m.numero}"><button class="mini">Salvar</button></form></span>
+        </div>`).join('')}</div>` : vazio('Nenhuma mesa ainda. A primeira pode ser a mesa 1.');
+        html += lotado
+            ? vazio('A capacidade de mesas deste restaurante já foi atingida.')
+            : formDono('add-mesa-pagina', 'nova mesa', `<div class="linha"><label>Número <input id="pg-m-num" type="number" min="1" value="${proximo}" required></label><label>Cadeiras <input id="pg-m-cad" type="number" min="1" value="4" required></label></div>
+                <input type="hidden" id="pg-m-x"><input type="hidden" id="pg-m-y">
+                <p class="mut" id="pg-m-pos">Clique num espaço vazio do mapa para escolher o lugar — ou deixe o sistema posicionar.</p>`);
+        c.innerHTML = html;
+    });
+}
+
+async function carregarFila() {
+    const lead = $('lead-fila');
+    const c = $('lista-fila');
+    if (ehRestaurante()) {
+        if (lead) lead.textContent = 'Quando o salão estiver cheio, os clientes entram aqui. Chame o próximo quando liberar uma mesa.';
+        await tentar(async () => {
+            const f = await api('/fila-recebida');
+            c.innerHTML = f.length ? f.map((x) => `<div>
+                <span><span class="pos">${x.posicao}</span> &nbsp;<strong>${esc(x.user?.name || '')}</strong> · ${esc(x.restaurante?.nome || '')}</span>
+                <span><span class="mut">entrou às ${String(x.hora_entrada).slice(0, 5)}</span>
+                ${x.posicao === 1 ? `<button class="mini primario" data-acao="fila-chamar" data-restaurante="${x.restaurante_id}">Chamar</button>` : ''}</span>
+            </div>`).join('') : vazio('Ninguém esperando nos seus restaurantes.');
+        });
+        return;
+    }
+    if (lead) lead.textContent = 'A fila só abre quando não há mesa livre. Acompanhe sua posição aqui.';
+    await tentar(async () => {
+        const f = await api('/minha-fila');
+        c.innerHTML = f.length ? f.map((x) => `<div>
+            <span><span class="pos">${x.posicao}</span> &nbsp;<strong>${esc(x.restaurante?.nome || 'Restaurante')}</strong></span>
+            <span><span class="mut">entrou às ${String(x.hora_entrada).slice(0, 5)}</span>
+            <button class="mini" data-acao="fila-sair" data-restaurante="${x.restaurante_id}">Sair</button>
+            <button class="mini primario" data-abrir="${x.restaurante_id}" data-aba="fila">Ver salão</button></span>
+        </div>`).join('') : vazio('Você não está em nenhuma fila. Abra um restaurante cheio para entrar.');
+    });
+}
+
+function atualizarSalas() {
+    if (telaAtiva('tela-mesas')) return carregarMesas();
+    return mostrarAba('reservar');
+}
+function atualizarFila() {
+    if (telaAtiva('tela-fila')) return carregarFila();
+    return mostrarAba('fila');
+}
+function atualizarReservas(origemPagina) {
+    if (origemPagina || telaAtiva('tela-reservas')) return carregarReservas();
+    return mostrarAba('reservar');
 }
 
 // ---------- Conta ----------
@@ -524,7 +797,8 @@ const ACOES = {
         }
         document.querySelectorAll('.mapa-feed .lista > div').forEach((el) => el.classList.toggle('on', el.contains(b)));
     },
-    'mesa-status': async (b) => { await api(`/mesas/${b.dataset.id}`, { method: 'PATCH', corpo: { status: b.dataset.v } }); mostrarAba('reservar'); },
+    'mesa-status': async (b) => { await api(`/mesas/${b.dataset.id}`, { method: 'PATCH', corpo: { status: b.dataset.v } }); atualizarSalas(); },
+    'abrir-salao'(b) { E.salaoId = +b.dataset.id; navegarPara('tela-mesas'); },
     'mesa-sel'(b) {
         document.querySelectorAll('.assento.sel').forEach((el) => el.classList.remove('sel'));
         if (E.mesaSel == b.dataset.id) {
@@ -542,20 +816,26 @@ const ACOES = {
         if (E.mesaSel && ehDono()) {
             await api(`/mesas/${E.mesaSel}`, { method: 'PATCH', corpo: { pos_x: x, pos_y: y } });
             toast('Mesa movida no mapa!');
-            mostrarAba('reservar');
+            atualizarSalas();
             return;
         }
-        if ($('m-x')) { $('m-x').value = x; $('m-y').value = y; }
-        if ($('m-pos')) $('m-pos').textContent = `Posição coluna ${x + 1}, fileira ${y + 1} escolhida.`;
+        [['m-x', 'm-y', 'm-pos'], ['pg-m-x', 'pg-m-y', 'pg-m-pos']].forEach(([ix, iy, ip]) => {
+            if ($(ix)) { $(ix).value = x; $(iy).value = y; }
+            if ($(ip)) $(ip).textContent = `Posição coluna ${x + 1}, fileira ${y + 1} escolhida.`;
+        });
         toast('Posição escolhida para a nova mesa');
     },
     'res-status': async (b) => {
         await api(`/reservas/${b.dataset.id}`, { method: 'PATCH', corpo: { status_confirmacao: b.dataset.v } });
-        b.dataset.minhas ? carregarMinhasReservas() : mostrarAba('reservar');
+        atualizarReservas(b.dataset.origem === 'pagina');
     },
-    'fila-entrar': async () => { await api(`/restaurantes/${E.r.id}/fila`, { method: 'POST' }); toast('Você entrou na fila!'); mostrarAba('fila'); },
-    'fila-sair': async () => { await api(`/restaurantes/${E.r.id}/fila`, { method: 'DELETE' }); mostrarAba('fila'); },
-    'fila-chamar': async () => { const c = await api(`/restaurantes/${E.r.id}/fila/chamar`, { method: 'POST' }); toast(`Chamando ${c.user.name}!`); mostrarAba('fila'); },
+    'fila-entrar': async () => { await api(`/restaurantes/${E.r.id}/fila`, { method: 'POST' }); toast('Você entrou na fila!'); atualizarFila(); },
+    'fila-sair': async (b) => { await api(`/restaurantes/${b?.dataset?.restaurante || E.r?.id}/fila`, { method: 'DELETE' }); atualizarFila(); },
+    'fila-chamar': async (b) => {
+        const c = await api(`/restaurantes/${b?.dataset?.restaurante || E.r?.id}/fila/chamar`, { method: 'POST' });
+        toast(`Chamando ${c.user.name}!`);
+        atualizarFila();
+    },
     tema: () => aplicarTema(temaAtual() === 'escuro' ? 'claro' : 'escuro'),
 };
 
@@ -572,8 +852,8 @@ document.addEventListener('click', (e) => {
     const d = t.dataset;
     if (d.tela) navegarPara(d.tela);
     else if (d.rank) { E.rank = d.rank; carregarRanking(); }
+    else if (d.abrir) abrirRestaurante(d.abrir, d.aba);
     else if (d.aba) mostrarAba(d.aba);
-    else if (d.abrir) abrirRestaurante(d.abrir);
     else if (d.fav) tentar(() => alternarFavorito(d.fav));
     else if (d.pagina) carregarRestaurantes(+d.pagina);
     else if (d.acao && ACOES[d.acao]) tentar(() => ACOES[d.acao](t));
@@ -586,15 +866,19 @@ const FORMS = {
         E.token = r.token; guardarUsuario(r.usuario);
         localStorage.setItem('vago_token', r.token);
         f.reset();
-        E.favs = new Set((await api('/favoritos')).map((x) => x.id));
-        toast(`Bem-vindo, ${r.usuario.name}!`); navegarPara('tela-feed');
+        E.favs = new Set();
+        if (ehCliente()) E.favs = new Set((await api('/favoritos')).map((x) => x.id));
+        toast(`Bem-vindo, ${r.usuario.name}!`);
+        navegarPara(ehRestaurante() ? 'tela-mesas' : 'tela-feed');
     },
     async 'cad-usuario'(f) {
         const email = val('u-email');
         const password = $('u-senha').value;
+        const cpf = val('u-cpf').replace(/\D/g, '');
+        if (cpf && cpf.length !== 11) { toast('O CPF precisa ter 11 dígitos.', true); return; }
         await api('/usuarios', { method: 'POST', corpo: {
             name: val('u-nome'), email, password,
-            cpf: val('u-cpf') || null, telefone: val('u-tel') || null } });
+            cpf: cpf || null, telefone: val('u-tel') || null } });
         const r = await api('/login', { method: 'POST', corpo: { email, password } });
         E.token = r.token;
         guardarUsuario(r.usuario);
@@ -605,11 +889,35 @@ const FORMS = {
         navegarPara('tela-perfil');
     },
     async 'cad-restaurante'(f) {
-        await api('/restaurantes', { method: 'POST', corpo: {
-            nome: val('cad-nome'), categoria: $('cad-categoria').value, telefone: val('cad-telefone'),
-            endereco: val('cad-endereco'), descricao: val('cad-descricao'),
-            capacidade_mesas: +$('cad-capacidade').value || 0, tempo_tolerancia: $('cad-tolerancia').value || '00:15' } });
-        f.reset(); toast('Restaurante cadastrado! Você é o dono dele.'); navegarPara('tela-feed');
+        if (E.user?.tipo === 'cliente') {
+            toast('Saia da conta de cliente para cadastrar um restaurante.', true);
+            return;
+        }
+        const restaurante = {
+            nome: val('cad-nome'), categoria: $('cad-categoria').value, telefone: val('cad-telefone') || null,
+            endereco: val('cad-endereco'), descricao: val('cad-descricao') || null,
+            capacidade_mesas: +$('cad-capacidade').value || 0,
+            tempo_tolerancia: horaCurta('cad-tolerancia') || '00:15',
+        };
+        if (E.token && ehRestaurante()) {
+            await api('/restaurantes', { method: 'POST', corpo: restaurante });
+            f.reset();
+            toast('Restaurante cadastrado.');
+            navegarPara('tela-mesas');
+            return;
+        }
+        const email = val('cad-email');
+        const password = $('cad-senha').value;
+        await api('/cadastro/restaurante', { method: 'POST', corpo: {
+            name: val('cad-responsavel'), email, password, ...restaurante } });
+        const r = await api('/login', { method: 'POST', corpo: { email, password } });
+        E.token = r.token;
+        guardarUsuario(r.usuario);
+        localStorage.setItem('vago_token', r.token);
+        f.reset();
+        E.favs = new Set();
+        toast('Restaurante cadastrado. Agora você pode montar as mesas.');
+        navegarPara('tela-mesas');
     },
     async 'add-prato'() {
         await api(`/restaurantes/${E.r.id}/cardapio`, { method: 'POST', corpo: {
@@ -625,7 +933,26 @@ const FORMS = {
         const corpo = { numero: +val('m-num'), cadeiras: +val('m-cad') };
         if (val('m-x') !== '' && val('m-y') !== '') { corpo.pos_x = +val('m-x'); corpo.pos_y = +val('m-y'); }
         await api(`/restaurantes/${E.r.id}/mesas`, { method: 'POST', corpo });
-        mostrarAba('reservar');
+        toast('Mesa adicionada.');
+        atualizarSalas();
+    },
+    async 'add-mesa-pagina'() {
+        const corpo = { numero: +val('pg-m-num'), cadeiras: +val('pg-m-cad') };
+        if (val('pg-m-x') !== '' && val('pg-m-y') !== '') { corpo.pos_x = +val('pg-m-x'); corpo.pos_y = +val('pg-m-y'); }
+        await api(`/restaurantes/${E.salaoId}/mesas`, { method: 'POST', corpo });
+        toast('Mesa adicionada.');
+        carregarMesas();
+    },
+    async 'mesa-cadeiras'(f) {
+        const input = f.querySelector('input');
+        await api(`/mesas/${f.dataset.id}`, { method: 'PATCH', corpo: { cadeiras: +input.value } });
+        toast('Quantidade de cadeiras atualizada.');
+        atualizarSalas();
+    },
+    async 'add-promo-pagina'() {
+        await api(`/restaurantes/${$('pg-pr-rest').value}/promocoes`, { method: 'POST', corpo: { titulo: val('pg-pr-titulo'), banner_url: val('pg-pr-banner') || null } });
+        toast('Promoção publicada.');
+        carregarPromocoes();
     },
     async reservar() {
         await api(`/restaurantes/${E.r.id}/reservas`, { method: 'POST', corpo: {
@@ -651,6 +978,16 @@ const FORMS = {
         await api(`/avaliacoes/${id}/resposta`, { method: 'PUT', corpo: { resposta: val(`rp-${id}`) } });
         toast('Resposta publicada!'); mostrarAba('avaliacoes');
     },
+    async 'responder-pagina'(f) {
+        await api(`/avaliacoes/${f.dataset.id}/resposta`, { method: 'PUT', corpo: { resposta: f.querySelector('textarea').value.trim() } });
+        toast('Resposta publicada!');
+        carregarAvaliacoes();
+    },
+    async 'responder-prato-pagina'(f) {
+        await api(`/avaliacoes-pratos/${f.dataset.id}/resposta`, { method: 'PUT', corpo: { resposta: f.querySelector('textarea').value.trim() } });
+        toast('Resposta publicada!');
+        carregarAvaliacoes();
+    },
     async 'salvar-perfil'() {
         const p = await api('/perfil', { method: 'PATCH', corpo: { name: val('pf-nome'), telefone: val('pf-tel') || null } });
         guardarUsuario(p);
@@ -672,9 +1009,18 @@ $('filtro-raio').addEventListener('change', () => {
     if ($('filtro-raio').value && !E.geo) { pedirLocal(); return; }
     carregarRestaurantes();
 });
+document.addEventListener('change', (e) => {
+    if (e.target.id === 'pg-salao') { E.salaoId = +e.target.value; E.mesaSel = null; carregarMesas(); }
+});
 
 // ---------- Início ----------
 aplicarTema(temaAtual());
 atualizarConta();
 carregarCategorias();
-if (E.token) api('/favoritos').then((l) => { E.favs = new Set(l.map((x) => x.id)); }).catch(() => {});
+if (E.token) {
+    api('/perfil').then((p) => {
+        guardarUsuario(p);
+        if (p.tipo === 'restaurante') return null;
+        return api('/favoritos').then((l) => { E.favs = new Set(l.map((x) => x.id)); });
+    }).catch(() => {});
+}

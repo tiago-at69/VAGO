@@ -16,6 +16,8 @@ class FavoritoController extends Controller
 
     public function alternar(Request $request, Restaurante $restaurante)
     {
+        $request->user()->autorizarCliente();
+
         $resultado = $request->user()->favoritos()->toggle($restaurante->id);
 
         return response()->json(['favorito' => count($resultado['attached']) > 0]);

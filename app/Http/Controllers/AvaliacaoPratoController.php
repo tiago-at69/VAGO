@@ -13,6 +13,8 @@ class AvaliacaoPratoController extends Controller
 {
     public function store(Request $request, Cardapio $cardapio, CriarAvaliacaoPratoService $service)
     {
+        $request->user()->autorizarCliente();
+
         $dados = $request->validate([
             'nota' => 'required|integer|min:1|max:5',
             'comentario' => 'nullable|string|max:2000',

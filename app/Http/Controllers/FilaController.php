@@ -16,6 +16,20 @@ class FilaController extends Controller
 
     public function entrar(Request $request, Restaurante $restaurante)
     {
+        $request->user()->autorizarCliente();
+
+        if (! $restaurante->mesas()->exists()) {
+            throw ValidationException::withMessages([
+                'fila' => 'Este restaurante ainda não publicou mesas. A fila abre quando o salão estiver cheio.',
+            ]);
+        }
+
+        if (! $restaurante->estaCheio()) {
+            throw ValidationException::withMessages([
+                'fila' => 'Ainda há mesa livre. Faça uma reserva em vez de entrar na fila.',
+            ]);
+        }
+
         if ($restaurante->fila()->where('user_id', $request->user()->id)->exists()) {
             throw ValidationException::withMessages(['fila' => 'Você já está na fila deste restaurante.']);
         }
@@ -47,6 +61,33 @@ class FilaController extends Controller
         $this->reordenar($restaurante);
 
         return response()->json($primeiro);
+    }
+
+    public function minha(Request $request)
+    {
+        $request->user()->autorizarCliente();
+
+        return response()->json(
+            FilaEspera::with('restaurante:id,nome,categoria')
+                ->where('user_id', $request->user()->id)
+                ->orderBy('posicao')
+                ->get()
+        );
+    }
+
+    public function recebida(Request $request)
+    {
+        abort_unless($request->user()->ehRestaurante(), 403, 'A fila do salão é vista pela conta do restaurante.');
+
+        $ids = $request->user()->restaurantes()->pluck('id');
+
+        return response()->json(
+            FilaEspera::with(['user:id,name', 'restaurante:id,nome'])
+                ->whereIn('restaurante_id', $ids)
+                ->orderBy('restaurante_id')
+                ->orderBy('posicao')
+                ->get()
+        );
     }
 
     private function reordenar(Restaurante $restaurante): void
