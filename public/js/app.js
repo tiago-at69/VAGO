@@ -69,11 +69,27 @@ function navegarPara(id) {
     window.scrollTo(0, 0);
 }
 
+function iniciaisDe(nome) {
+    return String(nome || '')
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((p) => p[0])
+        .join('')
+        .toUpperCase() || '•';
+}
 function atualizarConta() {
     document.querySelectorAll('.logado').forEach((e) => (e.hidden = !E.token));
     document.querySelectorAll('.deslogado').forEach((e) => (e.hidden = !!E.token));
     const b = $('btn-perfil');
-    if (b) b.textContent = E.user?.name ? E.user.name.split(' ')[0] : 'Perfil';
+    const nome = E.user?.name || '';
+    if (b) {
+        b.title = nome ? `Perfil de ${nome}` : 'Perfil';
+        b.setAttribute('aria-label', b.title);
+    }
+    const ini = $('perfil-iniciais');
+    if (ini) ini.textContent = iniciaisDe(nome);
 }
 
 // ---------- Restaurantes ----------
@@ -426,6 +442,7 @@ function htmlPerfil(p) {
                 ${p.telefone ? `<span>📞 ${esc(p.telefone)}</span>` : ''}
                 <span>No VAGO desde ${dataBR(p.created_at)}</span>
             </div>
+            <button type="button" data-acao="sair">Sair da conta</button>
         </div>
         <div class="numeros">
             <button type="button" data-tela="tela-favoritos"><strong>${c.favoritos ?? 0}</strong><span>Favoritos</span></button>
@@ -573,10 +590,19 @@ const FORMS = {
         toast(`Bem-vindo, ${r.usuario.name}!`); navegarPara('tela-feed');
     },
     async 'cad-usuario'(f) {
+        const email = val('u-email');
+        const password = $('u-senha').value;
         await api('/usuarios', { method: 'POST', corpo: {
-            name: val('u-nome'), email: val('u-email'), password: $('u-senha').value,
+            name: val('u-nome'), email, password,
             cpf: val('u-cpf') || null, telefone: val('u-tel') || null } });
-        f.reset(); toast('Conta criada! Agora é só entrar.');
+        const r = await api('/login', { method: 'POST', corpo: { email, password } });
+        E.token = r.token;
+        guardarUsuario(r.usuario);
+        localStorage.setItem('vago_token', r.token);
+        f.reset();
+        E.favs = new Set();
+        toast(`Conta criada, ${r.usuario.name}!`);
+        navegarPara('tela-perfil');
     },
     async 'cad-restaurante'(f) {
         await api('/restaurantes', { method: 'POST', corpo: {

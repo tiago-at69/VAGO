@@ -31,16 +31,10 @@
         <button type="button" data-tela="tela-contato" data-nav="tela-contato">Contato</button>
     </nav>
     <div class="acoes">
-        <button type="button" class="icone logado" data-tela="tela-favoritos" hidden title="Favoritos" aria-label="Favoritos">♥</button>
-        <button type="button" class="ghost logado" data-tela="tela-cadastro" hidden>Cadastrar</button>
-        <button type="button" class="ghost logado" id="btn-perfil" data-tela="tela-perfil" hidden>Perfil</button>
         <button type="button" class="ghost deslogado" data-tela="tela-login">Entrar</button>
-        <button type="button" class="icone" data-tela="tela-perfil" title="Perfil" aria-label="Perfil">
-            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-                <path fill="currentColor" d="M12 12.2a4.1 4.1 0 1 0 0-8.2 4.1 4.1 0 0 0 0 8.2zM4.8 19.6c.7-3.1 3.5-4.8 7.2-4.8s6.5 1.7 7.2 4.8c.2.7-.3 1.4-1 1.4H5.8c-.7 0-1.2-.7-1-1.4z"/>
-            </svg>
+        <button type="button" class="icone logado" id="btn-perfil" data-tela="tela-perfil" hidden title="Perfil" aria-label="Perfil">
+            <span class="avatar" id="perfil-iniciais" aria-hidden="true"></span>
         </button>
-        <button type="button" class="ghost logado" data-acao="sair" hidden>Sair</button>
         <button type="button" class="icone" id="btn-tema" data-acao="tema" aria-pressed="false" title="Ativar modo escuro" aria-label="Ativar modo escuro">
             <svg class="ico-lua" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M15.5 3.2a8.2 8.2 0 1 0 5.3 12.6A7 7 0 0 1 15.5 3.2z" fill="currentColor"/></svg>
             <svg class="ico-sol" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" hidden><circle cx="12" cy="12" r="4" fill="currentColor"/><path d="M12 2.4v2.2M12 19.4v2.2M4.6 12H2.4M21.6 12h-2.2M6.1 6.1 4.5 4.5M19.5 19.5l-1.6-1.6M17.9 6.1l1.6-1.6M6.1 17.9 4.5 19.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
