@@ -298,8 +298,10 @@ async function abrirRestaurante(id, aba) {
         E.mesaSel = null;
         const voltar = $('btn-voltar-detalhe');
         if (voltar) {
-            voltar.dataset.tela = ehRestaurante() ? 'tela-cardapio' : 'tela-feed';
-            voltar.textContent = ehRestaurante() ? '← Voltar para Meu restaurante' : '← Voltar aos restaurantes';
+            const varios = ehRestaurante() && E.variosSaloes;
+            voltar.hidden = ehRestaurante() && !varios;
+            voltar.dataset.tela = varios ? 'tela-cardapio' : 'tela-feed';
+            voltar.textContent = varios ? '← Meus restaurantes' : '← Voltar aos restaurantes';
         }
         const r = E.r;
         $('detalhe-topo').innerHTML = `
@@ -693,23 +695,26 @@ async function carregarAvaliacoes() {
 async function carregarCardapio() {
     if (!ehRestaurante()) { navegarPara(E.token ? 'tela-feed' : 'tela-login'); return; }
     const c = $('lista-cardapio');
+    const lead = $('lead-cardapio');
     c.innerHTML = vazio('Carregando...');
     await tentar(async () => {
         const perfil = await api('/perfil');
         const meus = perfil.restaurantes || [];
+        E.variosSaloes = meus.length > 1;
         if (!meus.length) {
-            c.innerHTML = vazio('Publique o restaurante para montar o cardápio.') + '<button class="primario" data-tela="tela-cadastro">Cadastrar restaurante</button>';
+            if (lead) lead.textContent = 'Publique o salão para cuidar do cardápio, das mesas, das promoções e da fila.';
+            c.innerHTML = vazio('Você ainda não cadastrou um restaurante.') + '<button class="primario" data-tela="tela-cadastro">Cadastrar restaurante</button>';
             return;
         }
-        if (!E.salaoId || !meus.some((r) => r.id == E.salaoId)) E.salaoId = meus[0].id;
-        const info = meus.find((r) => r.id == E.salaoId);
-        const itens = await api(`/restaurantes/${E.salaoId}/cardapio`);
-        const escolha = meus.length > 1
-            ? `<label>Restaurante <select id="pg-cardapio-salao">${meus.map((r) => `<option value="${r.id}"${r.id == E.salaoId ? ' selected' : ''}>${esc(r.nome)}</option>`).join('')}</select></label>`
-            : `<p><strong>${esc(info.nome)}</strong></p>`;
-        c.innerHTML = escolha
-            + htmlCardapio(itens, true)
-            + formDono('add-prato-pagina', 'novo prato', camposPrato('pg-'));
+        if (meus.length === 1) {
+            abrirRestaurante(meus[0].id, 'cardapio');
+            return;
+        }
+        if (lead) lead.textContent = 'Escolha o salão. Dentro dele estão o cardápio, o mapa, as mesas, as promoções, a fila e as avaliações.';
+        c.innerHTML = `<div class="lista">${meus.map((r) => `<div>
+            <span><strong>${esc(r.nome)}</strong> · ${esc(r.categoria || 'Geral')}</span>
+            <button class="mini primario" data-acao="abrir-cardapio" data-id="${r.id}">Abrir</button>
+        </div>`).join('')}</div>`;
     });
 }
 
@@ -849,7 +854,7 @@ const ACOES = {
     },
     'mesa-status': async (b) => { await api(`/mesas/${b.dataset.id}`, { method: 'PATCH', corpo: { status: b.dataset.v } }); atualizarSalas(); },
     'abrir-salao'(b) { E.salaoId = +b.dataset.id; navegarPara('tela-mesas'); },
-    'abrir-cardapio'(b) { E.salaoId = +b.dataset.id; navegarPara('tela-cardapio'); },
+    'abrir-cardapio'(b) { abrirRestaurante(b.dataset.id, 'cardapio'); },
     'mesa-sel'(b) {
         document.querySelectorAll('.assento.sel').forEach((el) => el.classList.remove('sel'));
         if (E.mesaSel == b.dataset.id) {
@@ -1073,7 +1078,6 @@ $('filtro-raio').addEventListener('change', () => {
 });
 document.addEventListener('change', (e) => {
     if (e.target.id === 'pg-salao') { E.salaoId = +e.target.value; E.mesaSel = null; carregarMesas(); }
-    if (e.target.id === 'pg-cardapio-salao') { E.salaoId = +e.target.value; carregarCardapio(); }
 });
 
 // ---------- Início ----------
