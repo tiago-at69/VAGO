@@ -40,6 +40,38 @@ class DominioTest extends TestCase
         $this->getJson("/api/restaurantes/{$r->id}/cardapio")->assertOk()->assertJsonCount(1);
     }
 
+    public function test_dono_edita_nome_preco_e_foto_do_prato(): void
+    {
+        [$dono, $r] = $this->restauranteComDono();
+        $prato = $r->cardapios()->create([
+            'nome' => 'Pizza', 'preco' => 40, 'categoria' => 'Prato principal', 'descricao' => 'Mussarela',
+        ]);
+
+        $this->actingAs(User::factory()->create(), 'sanctum')
+            ->patchJson("/api/cardapios/{$prato->id}", ['nome' => 'Outra', 'preco' => 10])
+            ->assertForbidden();
+
+        $this->actingAs(User::factory()->restaurante()->create(), 'sanctum')
+            ->patchJson("/api/cardapios/{$prato->id}", ['nome' => 'Outra', 'preco' => 10])
+            ->assertForbidden();
+
+        $this->actingAs($dono, 'sanctum')
+            ->patchJson("/api/cardapios/{$prato->id}", [
+                'nome' => 'Pizza da casa',
+                'preco' => 45.5,
+                'foto' => 'https://exemplo.com/pizza.jpg',
+            ])
+            ->assertOk()
+            ->assertJsonPath('nome', 'Pizza da casa')
+            ->assertJsonPath('preco', 45.5)
+            ->assertJsonPath('foto', 'https://exemplo.com/pizza.jpg')
+            ->assertJsonPath('descricao', 'Mussarela');
+
+        $this->patchJson("/api/cardapios/{$prato->id}", ['nome' => 'Pizza da casa', 'preco' => 45.5, 'foto' => null])
+            ->assertOk()
+            ->assertJsonPath('foto', null);
+    }
+
     public function test_reserva_valida_lotacao_e_conflito_de_horario(): void
     {
         [, $r] = $this->restauranteComDono();

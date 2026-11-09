@@ -54,6 +54,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/reservas/{reserva}', [ReservaController::class, 'atualizar']);
     Route::put('/avaliacoes/{avaliacao}/resposta', [AvaliacaoController::class, 'responder']);
     Route::post('/cardapios/{cardapio}/avaliacoes', [AvaliacaoPratoController::class, 'store']);
+    Route::patch('/cardapios/{cardapio}', [ConteudoController::class, 'atualizarPrato']);
     Route::put('/avaliacoes-pratos/{avaliacao_prato}/resposta', [AvaliacaoPratoController::class, 'responder']);
 
     Route::prefix('/restaurantes/{restaurante}')->whereNumber('restaurante')->group(function () {

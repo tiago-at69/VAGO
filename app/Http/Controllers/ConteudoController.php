@@ -47,6 +47,26 @@ class ConteudoController extends Controller
         return response()->json($restaurante->cardapios()->create($dados), 201);
     }
 
+    public function atualizarPrato(Request $request, Cardapio $cardapio)
+    {
+        $cardapio->restaurante->autorizarDono($request->user());
+
+        $dados = $request->validate([
+            'nome' => 'required|string|max:255',
+            'preco' => 'required|numeric|min:0',
+            'foto' => 'nullable|url|max:500',
+        ], [
+            'nome.required' => 'Informe o nome do prato.',
+            'preco.required' => 'Informe o preço.',
+            'preco.numeric' => 'O preço precisa ser um número.',
+            'foto.url' => 'A imagem precisa ser um link começando com http:// ou https://.',
+        ]);
+
+        $cardapio->update($dados);
+
+        return response()->json($cardapio);
+    }
+
     public function listar()
     {
         return response()->json(

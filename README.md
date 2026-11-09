@@ -31,6 +31,7 @@ php artisan test         # testes
 | POST | `/api/restaurantes` (só conta de restaurante; geocodifica o endereço) | Bearer |
 | GET | `/api/restaurantes/{id}/avaliacoes` · `/cardapio` · `/promocoes` · `/mesas` · `/fila` | não |
 | POST | `/api/restaurantes/{id}/cardapio` · `/promocoes` · `/mesas` | dono |
+| PATCH | `/api/cardapios/{id}` (nome, preço e foto) | dono |
 | PATCH | `/api/mesas/{id}` (status · cadeiras · `pos_x`/`pos_y`) | dono |
 | POST | `/api/restaurantes/{id}/reservas` · GET `/minhas-reservas` | cliente |
 | GET | `/api/reservas-recebidas` · `/api/restaurantes/{id}/reservas` | restaurante |

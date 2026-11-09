@@ -348,6 +348,12 @@ const cardPrato = (p, dono) => `<div class="card">
     ${p.descricao ? `<p>${esc(p.descricao)}</p>` : ''}
     <div class="preco">${brl(p.preco)}</div>
     <div class="nota">${notaTxt(p.avaliacoes_avg_nota, p.avaliacoes_count)}</div>
+    ${dono ? `<form data-acao="editar-prato" data-id="${p.id}">
+        <label>Nome <input name="nome" value="${esc(p.nome)}" required maxlength="255"></label>
+        <label>Preço (R$) <input name="preco" type="number" step="0.01" min="0" value="${esc(p.preco)}" required></label>
+        <label>Imagem <input name="foto" type="url" value="${esc(p.foto || '')}" placeholder="https://..." maxlength="500"></label>
+        <button class="mini primario">Salvar prato</button>
+    </form>` : ''}
     ${htmlAvaliacoesPrato(p, dono)}
     ${ehCliente() && !dono ? (p.minha_nota
         ? `<p class="mut">Você avaliou ★${p.minha_nota}</p>`
@@ -981,6 +987,16 @@ const FORMS = {
             nome: val('p-nome'), preco: val('p-preco'), categoria: $('p-cat').value,
             descricao: val('p-desc') || null, foto: val('p-foto') || null } });
         toast('Prato adicionado ao cardápio.');
+        mostrarAba('cardapio');
+    },
+    async 'editar-prato'(f) {
+        const foto = f.querySelector('[name="foto"]').value.trim();
+        await api(`/cardapios/${f.dataset.id}`, { method: 'PATCH', corpo: {
+            nome: f.querySelector('[name="nome"]').value.trim(),
+            preco: f.querySelector('[name="preco"]').value,
+            foto: foto || null,
+        } });
+        toast('Prato atualizado.');
         mostrarAba('cardapio');
     },
     async 'add-prato-pagina'() {
