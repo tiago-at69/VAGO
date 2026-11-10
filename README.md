@@ -8,8 +8,10 @@ O banco da aplicação é MySQL. Crie o banco e o usuário local (a senha abaixo
 
 ```sql
 CREATE DATABASE vago CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE vago_testing CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER 'vago'@'127.0.0.1' IDENTIFIED BY 'vago';
 GRANT ALL PRIVILEGES ON vago.* TO 'vago'@'127.0.0.1';
+GRANT ALL PRIVILEGES ON vago_testing.* TO 'vago'@'127.0.0.1';
 FLUSH PRIVILEGES;
 ```
 
@@ -19,7 +21,7 @@ cp .env.example .env
 php artisan key:generate
 php artisan migrate
 php artisan serve        # front em http://localhost:8000 (public/index.html)
-php artisan test         # testes (SQLite em memória, sem mexer no MySQL)
+php artisan test         # testes no MySQL, no banco vago_testing
 ```
 
 ## Endpoints
